@@ -1,23 +1,37 @@
 use std::{
-    collections::{HashMap, HashSet},
-    hash::Hash,
-    marker::PhantomData,
-    slice::Iter,
+    collections::{vec_deque, HashMap, HashSet},
     str::Chars,
 };
 
 use itertools;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-enum NodeValue {
+enum Node {
     Value { name: char, coef: Vec<Vec<String>> },
     Func(Box<FunctionNode>),
+}
+
+impl Node {
+    fn distribute(&self) -> TraversedExpr {
+        match &self {
+            Node::Value { name, coef } => {
+                if coef.len() != 0 {
+                    panic!("expected empty coefs");
+                }
+                TraversedExpr {
+                    var_nodes: HashMap::from([(*name, vec![vec![String::from("1")]])]),
+                    constant: vec![],
+                }
+            }
+            Node::Func(boxed_func) => boxed_func.distribute(vec![]),
+        }
+    }
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Eq)]
 struct FunctionNode {
     name: char,
-    nodes: Vec<NodeValue>,
+    nodes: Vec<Node>,
     constant: Vec<Vec<String>>,
 }
 
@@ -45,14 +59,14 @@ impl FunctionNode {
             .collect();
         for (i, node) in self.nodes.iter().enumerate() {
             match node {
-                NodeValue::Value { name, coef } => {
+                Node::Value { name, coef } => {
                     res.var_nodes.entry(*name).or_default().extend(
                         coef.iter()
                             .map(|item| itertools::concat(vec![prefix.clone(), item.clone()]))
                             .collect::<Vec<Vec<String>>>(),
                     );
                 }
-                NodeValue::Func(function) => {
+                Node::Func(function) => {
                     prefix.push(format!("a_{}{}", self.name, i));
                     let x_res = function.distribute(prefix.clone());
                     prefix.pop();
@@ -116,22 +130,22 @@ impl<'a> Parser<'a> {
         self.advance();
         let inner_call = self.expect_call();
         func_node.nodes.push(match inner_call {
-            ParsingRes::VarDependencies(c) => NodeValue::Value {
+            ParsingRes::VarDependencies(c) => Node::Value {
                 name: c,
                 coef: vec![vec![format!("a_{}{}", func_symbol, 0)]],
             },
-            ParsingRes::FunctionCall(call) => NodeValue::Func(call),
+            ParsingRes::FunctionCall(call) => Node::Func(call),
         });
         let mut i: usize = 1;
         while self.assert(',') {
             self.advance();
             let inner_call = self.expect_call();
             func_node.nodes.push(match inner_call {
-                ParsingRes::VarDependencies(c) => NodeValue::Value {
+                ParsingRes::VarDependencies(c) => Node::Value {
                     name: c,
                     coef: vec![vec![format!("a_{}{}", func_symbol, i)]],
                 },
-                ParsingRes::FunctionCall(call) => NodeValue::Func(call),
+                ParsingRes::FunctionCall(call) => Node::Func(call),
             });
             i += 1;
         }
@@ -193,7 +207,7 @@ impl<'a> Parser<'a> {
 mod tests {
     use crate::expander::ParsingRes;
 
-    use super::{FunctionNode, NodeValue, Parser, TraversedExpr};
+    use super::{FunctionNode, Node, Parser, TraversedExpr};
     use std::{
         collections::{HashMap, HashSet},
         vec,
@@ -204,11 +218,11 @@ mod tests {
         let left = FunctionNode {
             name: 'g',
             nodes: Vec::from([
-                NodeValue::Value {
+                Node::Value {
                     name: 'x',
                     coef: vec![vec![String::from("a_g0")]],
                 },
-                NodeValue::Value {
+                Node::Value {
                     name: 'y',
                     coef: vec![vec![String::from("a_g1")]],
                 },
@@ -218,8 +232,8 @@ mod tests {
         let root = FunctionNode {
             name: 'f',
             nodes: Vec::from([
-                NodeValue::Func(Box::new(left.clone())),
-                NodeValue::Func(Box::new(left.clone())),
+                Node::Func(Box::new(left.clone())),
+                Node::Func(Box::new(left.clone())),
             ]),
             constant: vec![vec!["a_fc".to_string()]],
         };
@@ -256,10 +270,46 @@ mod tests {
         let s = "f(g(x, y), z) = g(z, y)";
         let mut parser = Parser::new(HashSet::from(['x', 'y', 'z']));
         let (lhs, rhs) = parser.parse(s).unwrap();
-        // println!("{:?}", lhs);
-        // println!("{:?}", rhs);
-        // if let ParsingRes::FunctionCall(call) = lhs {
-        //     println!("{:?}", call.distribute(vec![]));
-        // }
+        let expected_lhs = ParsingRes::FunctionCall(Box::new(FunctionNode {
+            name: 'f',
+            nodes: vec![
+                Node::Func(Box::new(FunctionNode {
+                    name: 'g',
+                    nodes: vec![
+                        Node::Value {
+                            name: 'x',
+                            coef: vec![vec![String::from("a_g0")]],
+                        },
+                        Node::Value {
+                            name: 'y',
+                            coef: vec![vec![String::from("a_g1")]],
+                        },
+                    ],
+                    constant: vec![vec![String::from("a_gc")]],
+                })),
+                Node::Value {
+                    name: 'z',
+                    coef: vec![vec![String::from("a_f1")]],
+                },
+            ],
+            constant: vec![vec![String::from("a_fc")]],
+        }));
+        assert_eq!(expected_lhs, lhs);
+
+        let expected_rhs = ParsingRes::FunctionCall(Box::new(FunctionNode {
+            name: 'g',
+            nodes: vec![
+                Node::Value {
+                    name: 'z',
+                    coef: vec![vec![String::from("a_g0")]],
+                },
+                Node::Value {
+                    name: 'y',
+                    coef: vec![vec![String::from("a_g1")]],
+                },
+            ],
+            constant: vec![vec![String::from("a_gc")]],
+        }));
+        assert_eq!(expected_rhs, rhs);
     }
 }
