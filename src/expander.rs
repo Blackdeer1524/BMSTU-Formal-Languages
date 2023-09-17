@@ -1,18 +1,18 @@
 use std::{
-    collections::{vec_deque, HashMap, HashSet},
+    collections::{HashMap, HashSet},
     str::Chars,
 };
 
 use itertools;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-enum Node {
+pub enum Node {
     Value { name: char, coef: Vec<Vec<String>> },
     Func(Box<FunctionNode>),
 }
 
 impl Node {
-    fn distribute(&self) -> TraversedExpr {
+    pub fn distribute(&self) -> TraversedExpr {
         match &self {
             Node::Value { name, coef } => {
                 if coef.len() != 0 {
@@ -29,16 +29,16 @@ impl Node {
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Eq)]
-struct FunctionNode {
+pub struct FunctionNode {
     name: char,
     nodes: Vec<Node>,
     constant: Vec<Vec<String>>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Eq)]
-struct TraversedExpr {
-    var_nodes: HashMap<char, Vec<Vec<String>>>,
-    constant: Vec<Vec<String>>,
+pub struct TraversedExpr {
+    pub var_nodes: HashMap<char, Vec<Vec<String>>>,
+    pub constant: Vec<Vec<String>>,
 }
 
 impl FunctionNode {
@@ -82,19 +82,19 @@ impl FunctionNode {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-enum ParsingRes {
+pub enum ParsingRes {
     VarDependencies(char),
     FunctionCall(Box<FunctionNode>),
 }
 
-struct Parser<'a> {
+pub struct Parser<'a> {
     variables: HashSet<char>,
     next_char: Option<char>,
     rule_iter: Option<Chars<'a>>,
 }
 
 impl<'a> Parser<'a> {
-    fn new(variables: HashSet<char>) -> Parser<'a> {
+    pub fn new(variables: HashSet<char>) -> Parser<'a> {
         Parser {
             variables,
             next_char: None,
@@ -102,7 +102,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse(&mut self, rule: &'a str) -> Option<(ParsingRes, ParsingRes)> {
+    pub fn parse(&mut self, rule: &'a str) -> Option<(ParsingRes, ParsingRes)> {
         self.next_char = None;
         self.rule_iter = Some(rule.chars());
         let lhs = self.expect_call();
