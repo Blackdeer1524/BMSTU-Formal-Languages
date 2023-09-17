@@ -1,20 +1,23 @@
 use std::{
     collections::{HashMap, HashSet},
+    hash::Hash,
+    marker::PhantomData,
+    slice::Iter,
     str::Chars,
 };
 
 use itertools;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 enum NodeValue {
-    Value(Vec<Vec<String>>),
+    Value { name: char, coef: Vec<Vec<String>> },
     Func(Box<FunctionNode>),
 }
 
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug, Clone, PartialEq, Eq)]
 struct FunctionNode {
     name: char,
-    nodes: Vec<(char, NodeValue)>,
+    nodes: Vec<NodeValue>,
     constant: Vec<Vec<String>>,
 }
 
@@ -25,6 +28,14 @@ struct TraversedExpr {
 }
 
 impl FunctionNode {
+    fn new(name: char) -> FunctionNode {
+        FunctionNode {
+            name,
+            nodes: Vec::default(),
+            constant: vec![vec![format!("a_{}c", name)]],
+        }
+    }
+
     fn distribute(&self, mut prefix: Vec<String>) -> TraversedExpr {
         let mut res = TraversedExpr::default();
         res.constant = self
@@ -32,12 +43,11 @@ impl FunctionNode {
             .iter()
             .map(|item| itertools::concat(vec![prefix.clone(), item.clone()]))
             .collect();
-        for (i, (child_node, node)) in self.nodes.iter().enumerate() {
+        for (i, node) in self.nodes.iter().enumerate() {
             match node {
-                NodeValue::Value(value) => {
-                    res.var_nodes.entry(child_node.clone()).or_default().extend(
-                        value
-                            .iter()
+                NodeValue::Value { name, coef } => {
+                    res.var_nodes.entry(*name).or_default().extend(
+                        coef.iter()
                             .map(|item| itertools::concat(vec![prefix.clone(), item.clone()]))
                             .collect::<Vec<Vec<String>>>(),
                     );
@@ -57,41 +67,94 @@ impl FunctionNode {
     }
 }
 
+#[derive(Debug, PartialEq, Eq)]
+enum ParsingRes {
+    VarDependencies(char),
+    FunctionCall(Box<FunctionNode>),
+}
+
 struct Parser<'a> {
     variables: HashSet<char>,
     next_char: Option<char>,
-    rule_iter: Chars<'a>,
+    rule_iter: Option<Chars<'a>>,
 }
 
-/*
-EXPR ::= FUNCTION_CALL | CHAR
-FUNCTION_CALL ::= ZERO_ARGS | ONE_ARG | TWO_ARGS
-ZERO_ARGS ::= CHAR ("(" ")")?
-ONE_ARG ::= CHAR ("(" EXPR ")")
-TWO_ARGS ::= CHAR "(" EXPR "," EXPR ")"
-*/
-
 impl<'a> Parser<'a> {
-    fn parse(&mut self, rule: &'a str) /*  -> (FunctionNode, FunctionNode) */
-    {
-        self.rule_iter = rule.chars();
-        self.expect_call();
+    fn new(variables: HashSet<char>) -> Parser<'a> {
+        Parser {
+            variables,
+            next_char: None,
+            rule_iter: None,
+        }
     }
 
-    fn expect_call(&mut self) {
+    fn parse(&mut self, rule: &'a str) -> Option<(ParsingRes, ParsingRes)> {
+        self.next_char = None;
+        self.rule_iter = Some(rule.chars());
+        let lhs = self.expect_call();
+        if let None = self.consume('=') {
+            return None;
+        }
+        let rhs = self.expect_call();
+        return Some((lhs, rhs));
+    }
+
+    fn expect_call(&mut self) -> ParsingRes {
         let func_symbol = self.peek().unwrap();
-        // if let Some(_) = self.variables.get(&func_symbol) {
-        //     return
-        // }
+        self.advance();
+        if self.variables.contains(&func_symbol) {
+            return ParsingRes::VarDependencies(func_symbol);
+        }
+        let mut func_node = Box::new(FunctionNode::new(func_symbol));
+        if let None = self.peek() {
+            panic!("Parser couldn't find any tokens");
+        }
+        let next = self.peek().unwrap();
+        if next != '(' {
+            return ParsingRes::FunctionCall(func_node);
+        }
+        self.advance();
+        let inner_call = self.expect_call();
+        func_node.nodes.push(match inner_call {
+            ParsingRes::VarDependencies(c) => NodeValue::Value {
+                name: c,
+                coef: vec![vec![format!("a_{}{}", func_symbol, 0)]],
+            },
+            ParsingRes::FunctionCall(call) => NodeValue::Func(call),
+        });
+        let mut i: usize = 1;
+        while self.assert(',') {
+            self.advance();
+            let inner_call = self.expect_call();
+            func_node.nodes.push(match inner_call {
+                ParsingRes::VarDependencies(c) => NodeValue::Value {
+                    name: c,
+                    coef: vec![vec![format!("a_{}{}", func_symbol, i)]],
+                },
+                ParsingRes::FunctionCall(call) => NodeValue::Func(call),
+            });
+            i += 1;
+        }
+        self.consume(')');
+
+        ParsingRes::FunctionCall(func_node)
     }
 
     fn peek(&mut self) -> &Option<char> {
         if let None = self.next_char {
-            self.next_char = self.rule_iter.next();
+            self.next_char = self
+                .rule_iter
+                .as_mut()
+                .expect("expected initialized chars iter")
+                .next();
             loop {
                 if let Some(c) = self.next_char {
                     if c.is_whitespace() {
-                        self.next_char = self.rule_iter.next();
+                        self.next_char = self
+                            .rule_iter
+                            .as_mut()
+                            .expect("expected initialized chars iter")
+                            .next();
                         continue;
                     }
                 }
@@ -105,28 +168,58 @@ impl<'a> Parser<'a> {
     fn advance(&mut self) {
         self.next_char = None;
     }
+
+    fn consume(&mut self, expected: char) -> Option<()> {
+        if let Some(n) = self.peek() {
+            if n == &expected {
+                self.advance();
+                return Some(());
+            }
+        }
+        None
+    }
+
+    fn assert(&mut self, expected: char) -> bool {
+        if let Some(next) = self.peek() {
+            if next == &expected {
+                return true;
+            }
+        }
+        false
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{FunctionNode, NodeValue, TraversedExpr};
-    use std::{collections::HashMap, vec};
+    use crate::expander::ParsingRes;
+
+    use super::{FunctionNode, NodeValue, Parser, TraversedExpr};
+    use std::{
+        collections::{HashMap, HashSet},
+        vec,
+    };
 
     #[test]
     fn test_propogation() {
         let left = FunctionNode {
             name: 'g',
             nodes: Vec::from([
-                ('x', NodeValue::Value(vec![vec![String::from("a_g0")]])),
-                ('y', NodeValue::Value(vec![vec![String::from("a_g1")]])),
+                NodeValue::Value {
+                    name: 'x',
+                    coef: vec![vec![String::from("a_g0")]],
+                },
+                NodeValue::Value {
+                    name: 'y',
+                    coef: vec![vec![String::from("a_g1")]],
+                },
             ]),
             constant: vec![vec![String::from("a_gc")]],
         };
         let root = FunctionNode {
             name: 'f',
             nodes: Vec::from([
-                ('g', NodeValue::Func(Box::new(left.clone()))),
-                ('g', NodeValue::Func(Box::new(left.clone()))),
+                NodeValue::Func(Box::new(left.clone())),
+                NodeValue::Func(Box::new(left.clone())),
             ]),
             constant: vec![vec!["a_fc".to_string()]],
         };
@@ -156,5 +249,17 @@ mod tests {
 
         let res = root.distribute(vec![]);
         assert_eq!(expected, res);
+    }
+
+    #[test]
+    fn test_parsing() {
+        let s = "f(g(x, y), z) = g(z, y)";
+        let mut parser = Parser::new(HashSet::from(['x', 'y', 'z']));
+        let (lhs, rhs) = parser.parse(s).unwrap();
+        // println!("{:?}", lhs);
+        // println!("{:?}", rhs);
+        // if let ParsingRes::FunctionCall(call) = lhs {
+        //     println!("{:?}", call.distribute(vec![]));
+        // }
     }
 }
