@@ -114,9 +114,9 @@ impl<'a, 'b: 'a> EquationParser<'a, 'b> {
         }
     }
 
-    pub fn parse(&mut self, rule: &'a str) -> Option<ParsedEquation> {
+    pub fn parse(&mut self, equation: &'a str) -> Option<ParsedEquation> {
         self.next_char = None;
-        self.rule_iter = Some(rule.chars());
+        self.rule_iter = Some(equation.chars());
         let lhs = self.expect_call();
         if let None = self.consume('=') {
             return None;
