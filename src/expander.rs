@@ -93,7 +93,7 @@ pub struct EquationParser<'a, 'b: 'a> {
     variables: HashSet<char>,
     next_char: Option<char>,
     rule_iter: Option<Chars<'a>>,
-    declared_functions: &'b mut HashMap<char, usize>,
+    pub declared_functions: &'b mut HashMap<char, usize>,
 }
 
 pub struct ParsedEquation {
