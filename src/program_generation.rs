@@ -64,7 +64,7 @@ fn declare_functions(declared_funcs: &HashMap<char, usize>) -> String {
             // строгая монотонность
             r.push_str(
                 format!(
-                    "(assert (or (> a_{}0 1) (> a_{}1 1) (> a_{}c 0)))\n",
+                    "(assert (or (and (> a_{}0 1) (> a_{}1 1)) (> a_{}c 0)))\n",
                     fn_name, fn_name, fn_name
                 )
                 .as_str(),
