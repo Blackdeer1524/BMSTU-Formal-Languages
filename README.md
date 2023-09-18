@@ -28,3 +28,13 @@ cat input.txt | ./target/release/lab1 > result.txt
 cat input.txt | ./target/release/lab1 | z3 -in 
 ```
 
+# Используемые неравенства
+
+* Две системы связанные `or`
+
+![](img/2023-09-19-00-13-26.png)
+
+* Строгая монотонность
+
+![](img/2023-09-19-00-14-58.png)
+
