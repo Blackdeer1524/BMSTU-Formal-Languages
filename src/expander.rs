@@ -11,23 +11,6 @@ pub enum Node {
     Func(Box<FunctionNode>),
 }
 
-impl Node {
-    pub fn distribute(&self) -> TraversedExpr {
-        match &self {
-            Node::Value { name, coef } => {
-                if coef.len() != 0 {
-                    panic!("expected empty coefs");
-                }
-                TraversedExpr {
-                    var_nodes: HashMap::from([(*name, vec![vec![String::from("1")]])]),
-                    constant: vec![],
-                }
-            }
-            Node::Func(boxed_func) => boxed_func.distribute(vec![]),
-        }
-    }
-}
-
 #[derive(Default, Debug, Clone, PartialEq, Eq)]
 pub struct FunctionNode {
     name: char,
@@ -62,7 +45,12 @@ impl FunctionNode {
                 Node::Value { name, coef } => {
                     res.var_nodes.entry(*name).or_default().extend(
                         coef.iter()
-                            .map(|item| itertools::concat(vec![prefix.clone(), item.clone()]))
+                            .map(|item| {
+                                itertools::concat(vec![
+                                    prefix.clone(),
+                                    item.clone(),
+                                ])
+                            })
                             .collect::<Vec<Vec<String>>>(),
                     );
                 }
@@ -82,27 +70,51 @@ impl FunctionNode {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-pub enum ParsingRes {
-    VarDependencies(char),
+pub enum ParsedTerm {
+    Variable(char),
     FunctionCall(Box<FunctionNode>),
 }
 
-pub struct Parser<'a> {
+impl ParsedTerm {
+    pub(crate) fn distribute(&self) -> TraversedExpr {
+        match &self {
+            ParsedTerm::Variable(c) => TraversedExpr {
+                var_nodes: HashMap::from([(*c, vec![vec![String::from("1")]])]),
+                constant: vec![],
+            },
+            ParsedTerm::FunctionCall(boxed_func) => {
+                boxed_func.distribute(vec![])
+            }
+        }
+    }
+}
+
+pub struct EquationParser<'a, 'b: 'a> {
     variables: HashSet<char>,
     next_char: Option<char>,
     rule_iter: Option<Chars<'a>>,
+    declared_functions: &'b mut HashMap<char, usize>,
 }
 
-impl<'a> Parser<'a> {
-    pub fn new(variables: HashSet<char>) -> Parser<'a> {
-        Parser {
+pub struct ParsedEquation {
+    pub lhs: ParsedTerm,
+    pub rhs: ParsedTerm,
+}
+
+impl<'a, 'b: 'a> EquationParser<'a, 'b> {
+    pub fn new(
+        variables: HashSet<char>,
+        declared_functions: &'b mut HashMap<char, usize>,
+    ) -> EquationParser<'a, 'b> {
+        EquationParser {
             variables,
             next_char: None,
             rule_iter: None,
+            declared_functions,
         }
     }
 
-    pub fn parse(&mut self, rule: &'a str) -> Option<(ParsingRes, ParsingRes)> {
+    pub fn parse(&mut self, rule: &'a str) -> Option<ParsedEquation> {
         self.next_char = None;
         self.rule_iter = Some(rule.chars());
         let lhs = self.expect_call();
@@ -110,14 +122,14 @@ impl<'a> Parser<'a> {
             return None;
         }
         let rhs = self.expect_call();
-        return Some((lhs, rhs));
+        return Some(ParsedEquation { lhs, rhs });
     }
 
-    fn expect_call(&mut self) -> ParsingRes {
+    fn expect_call(&mut self) -> ParsedTerm {
         let func_symbol = self.peek().unwrap();
         self.advance();
         if self.variables.contains(&func_symbol) {
-            return ParsingRes::VarDependencies(func_symbol);
+            return ParsedTerm::Variable(func_symbol);
         }
         let mut func_node = Box::new(FunctionNode::new(func_symbol));
         if let None = self.peek() {
@@ -125,33 +137,42 @@ impl<'a> Parser<'a> {
         }
         let next = self.peek().unwrap();
         if next != '(' {
-            return ParsingRes::FunctionCall(func_node);
+            self.declared_functions.insert(func_symbol, 0);
+            return ParsedTerm::FunctionCall(func_node);
         }
         self.advance();
+        let next = self.peek().unwrap();
+        if next == ')' {
+            self.advance();
+            self.declared_functions.insert(func_symbol, 0);
+            return ParsedTerm::FunctionCall(func_node);
+        }
+
         let inner_call = self.expect_call();
         func_node.nodes.push(match inner_call {
-            ParsingRes::VarDependencies(c) => Node::Value {
+            ParsedTerm::Variable(c) => Node::Value {
                 name: c,
                 coef: vec![vec![format!("a_{}{}", func_symbol, 0)]],
             },
-            ParsingRes::FunctionCall(call) => Node::Func(call),
+            ParsedTerm::FunctionCall(call) => Node::Func(call),
         });
         let mut i: usize = 1;
         while self.assert(',') {
             self.advance();
             let inner_call = self.expect_call();
             func_node.nodes.push(match inner_call {
-                ParsingRes::VarDependencies(c) => Node::Value {
+                ParsedTerm::Variable(c) => Node::Value {
                     name: c,
                     coef: vec![vec![format!("a_{}{}", func_symbol, i)]],
                 },
-                ParsingRes::FunctionCall(call) => Node::Func(call),
+                ParsedTerm::FunctionCall(call) => Node::Func(call),
             });
             i += 1;
         }
         self.consume(')');
 
-        ParsingRes::FunctionCall(func_node)
+        self.declared_functions.insert(func_symbol, i);
+        ParsedTerm::FunctionCall(func_node)
     }
 
     fn peek(&mut self) -> &Option<char> {
@@ -205,9 +226,9 @@ impl<'a> Parser<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::expander::ParsingRes;
+    use crate::expander::{ParsedEquation, ParsedTerm};
 
-    use super::{FunctionNode, Node, Parser, TraversedExpr};
+    use super::{EquationParser, FunctionNode, Node, TraversedExpr};
     use std::{
         collections::{HashMap, HashSet},
         vec,
@@ -215,7 +236,8 @@ mod tests {
 
     #[test]
     fn test_propogation() {
-        let left = FunctionNode {
+        // f(g(x, y), g(x, y))
+        let child = FunctionNode {
             name: 'g',
             nodes: Vec::from([
                 Node::Value {
@@ -232,8 +254,8 @@ mod tests {
         let root = FunctionNode {
             name: 'f',
             nodes: Vec::from([
-                Node::Func(Box::new(left.clone())),
-                Node::Func(Box::new(left.clone())),
+                Node::Func(Box::new(child.clone())),
+                Node::Func(Box::new(child.clone())),
             ]),
             constant: vec![vec!["a_fc".to_string()]],
         };
@@ -268,9 +290,14 @@ mod tests {
     #[test]
     fn test_parsing() {
         let s = "f(g(x, y), z) = g(z, y)";
-        let mut parser = Parser::new(HashSet::from(['x', 'y', 'z']));
-        let (lhs, rhs) = parser.parse(s).unwrap();
-        let expected_lhs = ParsingRes::FunctionCall(Box::new(FunctionNode {
+        let mut declared_functions: HashMap<char, usize> = HashMap::new();
+
+        let mut parser = EquationParser::new(
+            HashSet::from(['x', 'y', 'z']),
+            &mut declared_functions,
+        );
+        let ParsedEquation { lhs, rhs } = parser.parse(s).unwrap();
+        let expected_lhs = ParsedTerm::FunctionCall(Box::new(FunctionNode {
             name: 'f',
             nodes: vec![
                 Node::Func(Box::new(FunctionNode {
@@ -296,7 +323,7 @@ mod tests {
         }));
         assert_eq!(expected_lhs, lhs);
 
-        let expected_rhs = ParsingRes::FunctionCall(Box::new(FunctionNode {
+        let expected_rhs = ParsedTerm::FunctionCall(Box::new(FunctionNode {
             name: 'g',
             nodes: vec![
                 Node::Value {
@@ -311,5 +338,9 @@ mod tests {
             constant: vec![vec![String::from("a_gc")]],
         }));
         assert_eq!(expected_rhs, rhs);
+
+        let expected_declared_functions =
+            HashMap::from([('f', 2usize), ('g', 2usize)]);
+        assert_eq!(expected_declared_functions, declared_functions);
     }
 }
