@@ -3,7 +3,7 @@ use std::{
     usize,
 };
 
-use crate::{expander::EquationParser, inequalities::generate_system};
+use crate::{parsing::EquationParser, systems::generate_system};
 
 fn parse_variables(vars_decl_line: &str) -> HashSet<char> {
     let eq_sign_index = vars_decl_line
@@ -102,7 +102,7 @@ pub fn generate(input: &str) -> String {
 {}
 (check-sat)
 (get-model)
-    "#,
+"#,
         declarations, systems
     )
 }

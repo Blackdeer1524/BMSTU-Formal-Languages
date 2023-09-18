@@ -2,8 +2,8 @@ use std::io::{self, Read};
 
 use program_generation::generate;
 
-pub(crate) mod expander;
-pub mod inequalities;
+pub mod systems;
+pub mod parsing;
 pub mod program_generation;
 
 fn main() {

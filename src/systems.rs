@@ -2,7 +2,7 @@ use std::vec;
 
 use itertools::Itertools;
 
-use crate::expander::ParsedEquation;
+use crate::parsing::{ParsedEquation, TraversedExpr};
 
 fn smt_coefs(coefs: &Vec<Vec<String>>) -> String {
     let res: Vec<String> = coefs
@@ -25,7 +25,7 @@ fn smt_coefs(coefs: &Vec<Vec<String>>) -> String {
 pub fn generate_system(eq: &ParsedEquation) -> String {
     let ParsedEquation { lhs, rhs } = eq;
     let traversed_lhs = lhs.distribute();
-    let mut traversed_rhs: crate::expander::TraversedExpr = rhs.distribute();
+    let mut traversed_rhs: TraversedExpr = rhs.distribute();
 
     let mut first_system = String::new();
     let mut second_system = String::new();
@@ -84,7 +84,7 @@ mod tests {
         vec,
     };
 
-    use crate::expander::{EquationParser, ParsedEquation, TraversedExpr};
+    use crate::parsing::{EquationParser, ParsedEquation, TraversedExpr};
 
     use super::{generate_system, smt_coefs};
     #[test]

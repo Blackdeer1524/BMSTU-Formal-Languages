@@ -226,7 +226,7 @@ impl<'a, 'b: 'a> EquationParser<'a, 'b> {
 
 #[cfg(test)]
 mod tests {
-    use crate::expander::{ParsedEquation, ParsedTerm};
+    use crate::parsing::{ParsedEquation, ParsedTerm};
 
     use super::{EquationParser, FunctionNode, Node, TraversedExpr};
     use std::{
