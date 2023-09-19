@@ -24,7 +24,7 @@ fn declare_functions(declared_funcs: &HashMap<char, usize>) -> String {
             r.push_str(format!("(declare-const a_{}c Int)", fn_name).as_str());
 
             // нестрогая монотонность
-            // r.push_str(format!("(assert  (>= a_{}c 0))\n", fn_name).as_str());
+            r.push_str(format!("(assert  (>= a_{}c 0))\n", fn_name).as_str());
             // строгая монотонность
             r.push_str(format!("(assert  (> a_{}c 0))\n", fn_name).as_str());
         } else if *arity == 1usize {
@@ -36,8 +36,8 @@ fn declare_functions(declared_funcs: &HashMap<char, usize>) -> String {
             );
 
             // нестрогая монотонность
-            // r.push_str(format!("(assert  (>= a_{}0 1))\n", fn_name).as_str());
-            // r.push_str(format!("(assert  (>= a_{}c 0))\n", fn_name).as_str());
+            r.push_str(format!("(assert  (>= a_{}0 1))\n", fn_name).as_str());
+            r.push_str(format!("(assert  (>= a_{}c 0))\n", fn_name).as_str());
             // строгая монотонность
             r.push_str(
                 format!(
@@ -58,9 +58,9 @@ fn declare_functions(declared_funcs: &HashMap<char, usize>) -> String {
             );
 
             // нестрогая монотонность
-            // r.push_str(format!("(assert  (>= a_{}0 1))\n", fn_name).as_str());
-            // r.push_str(format!("(assert  (>= a_{}1 1))\n", fn_name).as_str());
-            // r.push_str(format!("(assert  (>= a_{}c 0))\n", fn_name).as_str());
+            r.push_str(format!("(assert  (>= a_{}0 1))\n", fn_name).as_str());
+            r.push_str(format!("(assert  (>= a_{}1 1))\n", fn_name).as_str());
+            r.push_str(format!("(assert  (>= a_{}c 0))\n", fn_name).as_str());
             // строгая монотонность
             r.push_str(
                 format!(

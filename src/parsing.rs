@@ -288,6 +288,81 @@ mod tests {
     }
 
     #[test]
+    fn test_same_arg() {
+        let s = "f(x, x) = g(x, y)";
+        let mut declared_functions: HashMap<char, usize> = HashMap::new();
+
+        let mut parser = EquationParser::new(
+            HashSet::from(['x', 'y']),
+            &mut declared_functions,
+        );
+        let ParsedEquation { lhs, rhs } = parser.parse(s).unwrap();
+        let expected_lhs = ParsedTerm::FunctionCall(Box::new(FunctionNode {
+            name: 'f',
+            nodes: vec![
+                Node::Value {
+                    name: 'x',
+                    coef: vec![vec![String::from("a_f0")]],
+                },
+                Node::Value {
+                    name: 'x',
+                    coef: vec![vec![String::from("a_f1")]],
+                },
+            ],
+            constant: vec![vec![String::from("a_fc")]],
+        }));
+        assert_eq!(expected_lhs, lhs);
+
+        let expected_rhs = ParsedTerm::FunctionCall(Box::new(FunctionNode {
+            name: 'g',
+            nodes: vec![
+                Node::Value {
+                    name: 'x',
+                    coef: vec![vec![String::from("a_g0")]],
+                },
+                Node::Value {
+                    name: 'y',
+                    coef: vec![vec![String::from("a_g1")]],
+                },
+            ],
+            constant: vec![vec![String::from("a_gc")]],
+        }));
+        assert_eq!(expected_rhs, rhs);
+
+        let expected_declared_functions =
+            HashMap::from([('f', 2usize), ('g', 2usize)]);
+        assert_eq!(expected_declared_functions, declared_functions);
+    }
+
+    #[test]
+    fn test_same_arg_prop() {
+        let root = FunctionNode {
+            name: 'f',
+            nodes: vec![
+                Node::Value {
+                    name: 'x',
+                    coef: vec![vec![String::from("a_f0")]],
+                },
+                Node::Value {
+                    name: 'x',
+                    coef: vec![vec![String::from("a_f1")]],
+                },
+            ],
+            constant: vec![vec![String::from("a_fc")]],
+        };
+        let expected = TraversedExpr {
+            var_nodes: HashMap::from([(
+                'x',
+                vec![vec![String::from("a_f0")], vec![String::from("a_f1")]],
+            )]),
+            constant: vec![vec![String::from("a_fc")]],
+        };
+
+        let res = root.distribute(vec![]);
+        assert_eq!(expected, res);
+    }
+
+    #[test]
     fn test_parsing() {
         let s = "f(g(x, y), z) = g(z, y)";
         let mut declared_functions: HashMap<char, usize> = HashMap::new();
