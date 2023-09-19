@@ -23,7 +23,7 @@ cargo build --release
 * Генерация файла со спецификацией:
 
 ```bash
-cat input.txt | ./target/release/lab1 > result.txt 
+cat input.txt | ./target/release/lab1 > result.smt
 ```
 
 * Прогон с z3:

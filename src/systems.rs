@@ -93,7 +93,7 @@ pub fn generate_system(eq: &ParsedEquation) -> String {
         strict_decreasing, lhs_smt_consts, rhs_smt_consts
     );
 
-    let res = format!("(and {} {})", system, strict_decreasing);
+    let res = format!("(and \n{}\n{})", system, strict_decreasing);
     res
 }
 
