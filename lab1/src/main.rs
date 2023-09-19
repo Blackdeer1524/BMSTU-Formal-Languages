@@ -2,9 +2,9 @@ use std::io::{self, Read};
 
 use program_generation::generate;
 
-pub mod systems;
 pub mod parsing;
 pub mod program_generation;
+pub mod systems;
 
 fn main() {
     let mut stdin = io::stdin();
