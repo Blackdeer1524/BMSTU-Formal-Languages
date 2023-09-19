@@ -21,14 +21,14 @@ fn smt_coefs(coefs: &Vec<Vec<String>>) -> String {
     res.join("")
 }
 
-// истинное >= переписанное
 pub fn generate_system(eq: &ParsedEquation) -> String {
     let ParsedEquation { lhs, rhs } = eq;
     let traversed_lhs = lhs.distribute();
     let mut traversed_rhs: TraversedExpr = rhs.distribute();
 
-    let mut first_system = String::new();
-    let mut second_system = String::new();
+    let mut system = String::new();
+    let mut strict_decreasing = String::new();
+
     for (lhs_var_name, lhs_coefs) in traversed_lhs.var_nodes.iter() {
         let (_, rhs_coefs) = traversed_rhs
             .var_nodes
@@ -37,7 +37,7 @@ pub fn generate_system(eq: &ParsedEquation) -> String {
 
         let lhs_smt_coefs = smt_coefs(&lhs_coefs);
         let rhs_smt_coefs = smt_coefs(&rhs_coefs);
-        first_system.push_str(
+        system.push_str(
             format!(
                 "(>= {} {})",
                 lhs_smt_coefs.as_str(),
@@ -45,26 +45,42 @@ pub fn generate_system(eq: &ParsedEquation) -> String {
             )
             .as_str(),
         );
-        second_system.push_str(
+
+        strict_decreasing.push_str(
             format!(
                 "(> {} {})",
                 lhs_smt_coefs.as_str(),
                 rhs_smt_coefs.as_str()
             )
             .as_str(),
-        );
+        )
     }
+    for (_, rhs_coefs) in traversed_rhs.var_nodes.iter() {
+        let lhs_coefs = vec![vec!["0".to_string()]];
+        let lhs_smt_coefs = smt_coefs(&lhs_coefs);
+        let rhs_smt_coefs = smt_coefs(&rhs_coefs);
+        system.push_str(
+            format!(
+                "(>= {} {})",
+                lhs_smt_coefs.as_str(),
+                rhs_smt_coefs.as_str()
+            )
+            .as_str(),
+        );
+
+        strict_decreasing.push_str(
+            format!(
+                "(> {} {})",
+                lhs_smt_coefs.as_str(),
+                rhs_smt_coefs.as_str()
+            )
+            .as_str(),
+        )
+    }
+
     let lhs_smt_consts = smt_coefs(&traversed_lhs.constant);
     let rhs_smt_consts = smt_coefs(&traversed_rhs.constant);
-    first_system.push_str(
-        format!(
-            "(> {} {})",
-            lhs_smt_consts.as_str(),
-            rhs_smt_consts.as_str()
-        )
-        .as_str(),
-    );
-    second_system.push_str(
+    system.push_str(
         format!(
             "(>= {} {})",
             lhs_smt_consts.as_str(),
@@ -72,21 +88,20 @@ pub fn generate_system(eq: &ParsedEquation) -> String {
         )
         .as_str(),
     );
+    strict_decreasing = format!(
+        "(or (and {}) (> {} {}))",
+        strict_decreasing, lhs_smt_consts, rhs_smt_consts
+    );
 
-    let res = format!("(or (and {}) (and {}))", first_system, second_system);
+    let res = format!("(and {} {})", system, strict_decreasing);
     res
 }
 
 #[cfg(test)]
 mod tests {
-    use std::{
-        collections::{HashMap, HashSet},
-        vec,
-    };
+    use std::vec;
 
-    use crate::parsing::{EquationParser, ParsedEquation, TraversedExpr};
-
-    use super::{generate_system, smt_coefs};
+    use super::smt_coefs;
     #[test]
     fn test_simple_smt_repr() {
         let target = vec![vec![String::from("a_gc")]];
@@ -107,33 +122,5 @@ mod tests {
         let expected = "(+ (* a_f0 a_g0) a_gc)";
 
         assert_eq!(expected, result);
-    }
-
-    #[test]
-    fn test_systems_gen() {
-        let expr = "f(g(x, y)) = g(h(y), x)";
-
-        let variables = HashSet::from(['x', 'y']);
-        let mut declared_functions: HashMap<char, usize> = HashMap::default();
-        let mut parser =
-            EquationParser::new(variables, &mut declared_functions);
-
-        let parsed_equation = parser.parse(expr).unwrap();
-        let system = generate_system(&parsed_equation);
-        let _expected = r#"
-        (or 
-            (and 
-                (>= (* a_f0 a_g0) a_g1)
-                (>= (* a_f0 a_g1) (* a_g0 a_h0))
-                (> (+ a_fc (* a_f0 a_gc)) (+ a_gc (* a_g0 a_hc)))
-            ) 
-            (and 
-                (> (* a_f0 a_g0) a_g1)
-                (> (* a_f0 a_g1) (* a_g0 a_h0))
-                (>= (+ a_fc (* a_f0 a_gc)) (+ a_gc (* a_g0 a_hc)))
-            )
-        )"#;
-        // Работает, но нельзя чекнуть через ассерт из-за рандомности мап
-        println!("{}", system);
     }
 }
