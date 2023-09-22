@@ -34,12 +34,16 @@ impl FunctionNode {
     }
 
     fn distribute(&self, mut prefix: Vec<String>) -> TraversedExpr {
-        let mut res = TraversedExpr::default();
-        res.constant = self
-            .constant
-            .iter()
-            .map(|item| itertools::concat(vec![prefix.clone(), item.clone()]))
-            .collect();
+        let mut res = TraversedExpr {
+            var_nodes: HashMap::default(),
+            constant: self
+                .constant
+                .iter()
+                .map(|item| {
+                    itertools::concat(vec![prefix.clone(), item.clone()])
+                })
+                .collect(),
+        };
         for (i, node) in self.nodes.iter().enumerate() {
             match node {
                 Node::Value { name, coef } => {
