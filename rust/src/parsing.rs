@@ -154,7 +154,7 @@ impl<'a> Parser<'a> {
                                     OperationArg::Operation(Operation::Star(
                                         Box::new(OperationArg::Const {
                                             expr: expr.clone(),
-                                            parenthesized: false,
+                                            parenthesized: true,
                                         }),
                                     ))
                             } else {
@@ -283,7 +283,7 @@ mod tests {
     use super::Parser;
 
     #[test]
-    fn const_test() {
+    fn basic_const_test() {
         let expr = "test_regex";
         let mut parser = Parser::default();
 
@@ -296,7 +296,7 @@ mod tests {
     }
 
     #[test]
-    fn alternative_test() {
+    fn basic_alternative_test() {
         let expr = "abc|cde";
         let mut parser = Parser::default();
 
@@ -315,7 +315,7 @@ mod tests {
     }
 
     #[test]
-    fn concat_test() {
+    fn basic_concat_test() {
         let expr = "abc(cde)efg";
         let mut parser = Parser::default();
 
@@ -334,6 +334,21 @@ mod tests {
                 parenthesized: false,
             },
         ]));
+        assert_eq!(expected, res);
+    }
+
+    #[test]
+    fn basic_star_test() {
+        let expr = "(abc)*";
+        let mut parser = Parser::default();
+
+        let res = parser.parse(expr);
+        let expected = OperationArg::Operation(Operation::Star(Box::new(
+            OperationArg::Const {
+                expr: "abc".to_string(),
+                parenthesized: true,
+            },
+        )));
         assert_eq!(expected, res);
     }
 }
