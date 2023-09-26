@@ -1,26 +1,16 @@
-use std::{fmt::format, str::Chars, vec};
+use std::{ops::Deref, os::unix::prelude::OpenOptionsExt, str::Chars, vec};
 
+#[derive(Clone)]
 enum Operation {
-    Concat(Vec<OperationArgument>),
-    Star(Box<OperationArgument>),
-    Alternative(Vec<OperationArgument>),
+    Concat(Vec<OperationArg>),
+    Alternative(Vec<OperationArg>),
+    Star(Box<OperationArg>),
 }
 
-enum OperationArgument {
+#[derive(Clone)]
+enum OperationArg {
     Operation(Operation),
-    RawRegex(String),
-}
-
-#[derive(Clone)]
-enum NodeVariant {
-    Node(Node),
-    Regex(String),
-}
-
-#[derive(Clone)]
-struct Node {
-    children: Vec<NodeVariant>,
-    operation: Operation,
+    Const { expr: String, parenthesized: bool },
 }
 
 struct Parser<'a> {
@@ -36,9 +26,9 @@ impl<'a> Parser<'a> {
         self.regex_iter = Some(regex.chars());
     }
 
-    fn expect_regex(&mut self) -> NodeVariant {
+    fn expect_regex(&mut self) -> OperationArg {
         let mut cur_regex = String::new();
-        let mut current_node_opt: Option<NodeVariant> = None;
+        let mut node_opt: Option<OperationArg> = None;
         loop {
             let next_opt = self.peek();
             if next_opt.is_none() {
@@ -48,75 +38,176 @@ impl<'a> Parser<'a> {
             match next {
                 '(' => {
                     self.advance();
-                    let subexpr = self.expect_alternative();
-                    self.consume(')');
-
-                    if current_node_opt.is_none() {
-                        if cur_regex.is_empty() {
-                            current_node_opt = Some(subexpr);
-                        } else {
-                            current_node_opt = Some(NodeVariant::Node(Node {
-                                children: vec![NodeVariant::Regex(cur_regex)],
-                                operation: Operation::Concat,
-                            }));
-                            cur_regex = String::new();
-                        }
-                    } else {
-                        let node_variant = current_node_opt.as_mut().unwrap();
-                        match node_variant {
-                            NodeVariant::Node(node) => {
-                                let last = node
-                                    .children
-                                    .pop()
-                                    .expect("Nodes have at least one child");
-                                node.children.push(NodeVariant::Node(Node {
-                                    children: vec![last, subexpr],
-                                    operation: Operation::Concat,
-                                }));
-                            }
-                            NodeVariant::Regex(expr) => {
-                                current_node_opt =
-                                    Some(NodeVariant::Node(Node {
-                                        children: vec![
-                                            NodeVariant::Regex(expr.clone()),
-                                            subexpr,
-                                        ],
-                                        operation: Operation::Concat,
-                                    }))
-                            }
+                    let mut subexpr = self.expect_alternative();
+                    if let OperationArg::Const {
+                        expr,
+                        parenthesized,
+                    } = subexpr
+                    {
+                        subexpr = OperationArg::Const {
+                            expr,
+                            parenthesized: true,
                         }
                     }
+                    self.consume(')');
+
+                    if node_opt.is_none() {
+                        if cur_regex.is_empty() {
+                            node_opt = Some(subexpr);
+                        } else {
+                            node_opt = Some(OperationArg::Operation(
+                                Operation::Concat(vec![
+                                    subexpr,
+                                    OperationArg::Const {
+                                        expr: cur_regex,
+                                        parenthesized: false,
+                                    },
+                                ]),
+                            ));
+                            cur_regex = String::new();
+                        }
+                        continue;
+                    }
+                    let node_variant = node_opt.as_mut().unwrap();
+                    match node_variant {
+                        OperationArg::Operation(_) => todo!(),
+                        OperationArg::Const {
+                            expr,
+                            parenthesized,
+                        } => todo!(),
+                    }
+                    // match node_variant {
+                    //     Operation::Concat(operands) => {
+                    //         if !cur_regex.is_empty() {
+                    //             operands.push(OperationArg::Const {
+                    //                 expr: cur_regex,
+                    //                 parenthesized: false,
+                    //             });
+                    //             cur_regex = String::new();
+                    //         }
+                    //         operands.push(OperationArg::Operation(subexpr));
+                    //     }
+                    //     Operation::Alternative(_) => {
+                    //         if !cur_regex.is_empty() {
+                    //             node_opt = Some(Operation::Concat(vec![
+                    //                 OperationArg::Operation(node_opt.unwrap()),
+                    //                 OperationArg::Const {
+                    //                     expr: cur_regex,
+                    //                     parenthesized: false,
+                    //                 },
+                    //                 OperationArg::Operation(subexpr),
+                    //             ]));
+                    //             cur_regex = String::new();
+                    //         } else {
+                    //             node_opt = Some(Operation::Concat(vec![
+                    //                 OperationArg::Operation(node_opt.unwrap()),
+                    //                 OperationArg::Operation(subexpr),
+                    //             ]))
+                    //         }
+                    //     }
+                    //     Operation::Star(operand) => {
+                    //         if !cur_regex.is_empty() {
+                    //             node_opt = Some(Operation::Concat(vec![
+                    //                 OperationArg::Operation(Operation::Star(
+                    //                     Box::new(
+                    //                         operand.deref().deref().clone(),
+                    //                     ),
+                    //                 )),
+                    //                 OperationArg::Const {
+                    //                     expr: cur_regex,
+                    //                     parenthesized: false,
+                    //                 },
+                    //                 OperationArg::Operation(subexpr),
+                    //             ]));
+                    //             cur_regex = String::new();
+                    //         } else {
+                    //             node_opt = Some(Operation::Concat(vec![
+                    //                 OperationArg::Operation(Operation::Star(
+                    //                     Box::new(
+                    //                         operand.deref().deref().clone(),
+                    //                     ),
+                    //                 )),
+                    //                 OperationArg::Operation(subexpr),
+                    //             ]));
+                    //         }
+                    //     }
+                    // }
                 }
-                ')' => {
-                    break;
-                }
-                '|' => {
+                ')' | '|' => {
                     break;
                 }
                 '*' => {
-                    if current_node_opt.is_none() {
-                        self.report("star operation on empty expression");
+                    if node_opt.is_none() {
+                        if cur_regex.is_empty() {
+                            self.report("Star operation on empty expression");
+                        } else {
+                            let last_char = cur_regex.pop().unwrap();
+                            node_opt = Some(Operation::Concat(vec![
+                                OperationArg::Const {
+                                    expr: cur_regex,
+                                    parenthesized: false,
+                                },
+                                OperationArg::Operation(Operation::Star(
+                                    Box::new(OperationArg::Const(
+                                        last_char.to_string(),
+                                    )),
+                                )),
+                            ]));
+                            cur_regex = String::new();
+                        }
+                    } else {
+                        let mut node_variant = node_opt.as_mut().unwrap();
+                        match node_variant {
+                            Operation::Concat(operands) => {
+                                if !cur_regex.is_empty() {
+                                    operands.push(OperationArg::Operation(
+                                        Operation::Star(Box::new(
+                                            OperationArg::Const(cur_regex),
+                                        )),
+                                    ));
+                                    cur_regex = String::new();
+                                } else {
+                                    let last = operands.last_mut().unwrap();
+                                    match last {
+                                        OperationArg::Operation(op) => {
+                                            *last = OperationArg::Operation(
+                                                Operation::Star(Box::new(
+                                                    *last,
+                                                )),
+                                            );
+                                        }
+                                        OperationArg::Const(regex_str) => {
+                                            let last = regex_str.pop().unwrap();
+                                            operands.push(
+                                                OperationArg::Operation(
+                                                    Operation::Star(Box::new(
+                                                        OperationArg::Const(
+                                                            last.to_string(),
+                                                        ),
+                                                    )),
+                                                ),
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                            Operation::Alternative(operands) => {}
+                            Operation::Star(operand) => {}
+                        }
                     }
-                    let node_variant = current_node_opt.as_mut().unwrap();
+
+                    let node_variant = node_opt.as_mut().unwrap();
                     match node_variant {
-                        NodeVariant::Node(node) => {
-                            let last = node
-                                .children
+                        Operation::Concat(operands)
+                        | Operation::Alternative(operands) => {
+                            let last = operands
                                 .pop()
                                 .expect("Nodes have at least one child");
-                            node.children.push(NodeVariant::Node(Node {
-                                children: vec![last],
-                                operation: Operation::Star,
-                            }));
+                            operands.push(OperationArg::Operation(
+                                Operation::Star(Box::new(last)),
+                            ));
                         }
-                        NodeVariant::Regex(regex) => {
-                            current_node_opt = Some(NodeVariant::Node(Node {
-                                children: vec![NodeVariant::Regex(
-                                    regex.clone(),
-                                )],
-                                operation: Operation::Star,
-                            }))
-                        }
+                        Operation::Star(operand) => (), // так мы оптимизируем вложенною звёздочку
                     }
                 }
                 c => {
@@ -124,14 +215,14 @@ impl<'a> Parser<'a> {
                 }
             }
         }
-        current_node_opt.expect("expected to parse anything")
+        node_opt.expect("expected to parse anything")
     }
 
     fn report(&self, message: &str) -> ! {
         panic!("[col {}] {}", self.index, message);
     }
 
-    fn expect_alternative(&mut self) -> NodeVariant {
+    fn expect_alternative(&mut self) -> OperationArg {
         let node = self.expect_regex();
         if !self.expect('|') {
             return node;
@@ -148,10 +239,11 @@ impl<'a> Parser<'a> {
             self.advance();
         }
 
-        NodeVariant::Node(Node {
-            children,
-            operation: Operation::Alternative,
-        })
+        OperationArg::Operation(Operation::Alternative(children))
+        // NodeVariant::Node(Operation {
+        //     children,
+        //     operation: Operation::Alternative,
+        // })
     }
 
     fn peek(&mut self) -> Option<char> {
