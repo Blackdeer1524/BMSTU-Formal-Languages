@@ -23,8 +23,8 @@ fn smt_coefs(coefs: &Vec<Vec<String>>) -> String {
 
 pub fn generate_system(eq: &ParsedEquation) -> String {
     let ParsedEquation { lhs, rhs } = eq;
-    let traversed_lhs = lhs.distribute();
-    let mut traversed_rhs: TraversedExpr = rhs.distribute();
+    let traversed_lhs = lhs.propogate();
+    let mut traversed_rhs: TraversedExpr = rhs.propogate();
 
     let mut system = String::new();
     let mut strict_decreasing = String::new();

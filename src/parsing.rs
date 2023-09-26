@@ -33,7 +33,7 @@ impl FunctionNode {
         }
     }
 
-    fn distribute(&self, mut prefix: Vec<String>) -> TraversedExpr {
+    fn propogate(&self, mut prefix: Vec<String>) -> TraversedExpr {
         let mut res = TraversedExpr {
             var_nodes: HashMap::default(),
             constant: self
@@ -60,7 +60,7 @@ impl FunctionNode {
                 }
                 Node::Func(function) => {
                     prefix.push(format!("a_{}{}", self.name, i));
-                    let x_res = function.distribute(prefix.clone());
+                    let x_res = function.propogate(prefix.clone());
                     prefix.pop();
                     res.constant.extend(x_res.constant);
                     for (k, v) in x_res.var_nodes {
@@ -80,14 +80,14 @@ pub enum ParsedTerm {
 }
 
 impl ParsedTerm {
-    pub(crate) fn distribute(&self) -> TraversedExpr {
+    pub(crate) fn propogate(&self) -> TraversedExpr {
         match &self {
             ParsedTerm::Variable(c) => TraversedExpr {
                 var_nodes: HashMap::from([(*c, vec![vec![String::from("1")]])]),
                 constant: vec![],
             },
             ParsedTerm::FunctionCall(boxed_func) => {
-                boxed_func.distribute(vec![])
+                boxed_func.propogate(vec![])
             }
         }
     }
@@ -287,7 +287,7 @@ mod tests {
             ],
         };
 
-        let res = root.distribute(vec![]);
+        let res = root.propogate(vec![]);
         assert_eq!(expected, res);
     }
 
@@ -362,7 +362,7 @@ mod tests {
             constant: vec![vec![String::from("a_fc")]],
         };
 
-        let res = root.distribute(vec![]);
+        let res = root.propogate(vec![]);
         assert_eq!(expected, res);
     }
 
