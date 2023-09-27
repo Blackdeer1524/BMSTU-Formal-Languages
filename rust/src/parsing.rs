@@ -304,6 +304,8 @@ impl<'a> Parser<'a> {
 
 #[cfg(test)]
 mod tests {
+    use std::vec;
+
     use crate::parsing::{Operation, OperationArg};
 
     use super::Parser;
@@ -495,5 +497,43 @@ mod tests {
             },
         ]));
         assert_eq!(expected, res);
+    }
+
+    #[test]
+    fn star_simplification() {
+        let expr = "((abc)*|(bcd)*)**qa***(((abc)*)**)***";
+        let mut parser = Parser::default();
+
+        let res = parser.parse(expr);
+        let expected = OperationArg::Operation(Operation::Concat(vec![
+            OperationArg::Operation(Operation::Star(Box::new(
+                OperationArg::Operation(Operation::Alternative(vec![
+                    OperationArg::Const {
+                        expr: "abc".to_string(),
+                        parenthesized: true,
+                    },
+                    OperationArg::Const {
+                        expr: "bcd".to_string(),
+                        parenthesized: true,
+                    },
+                ])),
+            ))),
+            OperationArg::Const {
+                expr: "q".to_string(),
+                parenthesized: false,
+            },
+            OperationArg::Operation(Operation::Star(Box::new(
+                OperationArg::Const {
+                    expr: "a".to_string(),
+                    parenthesized: false,
+                },
+            ))),
+            OperationArg::Operation(Operation::Star(Box::new(
+                OperationArg::Const {
+                    expr: "abc".to_string(),
+                    parenthesized: false,
+                },
+            ))),
+        ]));
     }
 }
