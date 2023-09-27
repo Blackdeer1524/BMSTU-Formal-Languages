@@ -29,6 +29,7 @@ fn concat_const(
             let node_variant = node_opt.as_mut().unwrap();
             match node_variant {
                 OperationArg::Const { .. } => {
+                    // TODO: здесь можно упростить
                     *node_variant =
                         OperationArg::Operation(Operation::Concat(vec![
                             node_variant.deref().clone(),
@@ -193,28 +194,55 @@ impl<'a> Parser<'a> {
                                 )
                             }
                         }
-                        OperationArg::Operation(op) => match op {
-                            Operation::Concat(args) => {
-                                let last = args.last_mut().unwrap();
-                                propogate_star(last);
-                                *last =
-                                    OperationArg::Operation(Operation::Star(
-                                        Box::new(last.deref().clone()),
-                                    ))
-                            }
-                            Operation::Alternative(args) => {
-                                args.iter_mut().for_each(propogate_star);
-                                *node_variant =
-                                    OperationArg::Operation(Operation::Star(
-                                        Box::new(OperationArg::Operation(
-                                            op.deref().clone(),
+                        OperationArg::Operation(op) => {
+                            match op {
+                                Operation::Concat(args) => {
+                                    let last = args.last_mut().unwrap();
+                                    match last {
+                                        OperationArg::Const {
+                                            expr,
+                                            parenthesized,
+                                        } => {
+                                            if *parenthesized || expr.len() == 1
+                                            {
+                                                *last = OperationArg::Operation(
+                                                    Operation::Star(Box::new(
+                                                        last.deref().clone(),
+                                                    )),
+                                                )
+                                            } else {
+                                                let last_char =
+                                                    expr.pop().unwrap();
+                                                args.push(OperationArg::Operation(Operation::Star(
+                                                    Box::new(OperationArg::Const { expr: last_char.to_string(), parenthesized: false })
+                                                )));
+                                            }
+                                        }
+                                        OperationArg::Operation(_) => {
+                                            propogate_star(last);
+                                            *last = OperationArg::Operation(
+                                                Operation::Star(Box::new(
+                                                    last.deref().clone(),
+                                                )),
+                                            );
+                                        }
+                                    }
+                                }
+                                Operation::Alternative(args) => {
+                                    args.iter_mut().for_each(propogate_star);
+                                    *node_variant = OperationArg::Operation(
+                                        Operation::Star(Box::new(
+                                            OperationArg::Operation(
+                                                op.deref().clone(),
+                                            ),
                                         )),
-                                    ))
+                                    )
+                                }
+                                Operation::Star(arg) => {
+                                    propogate_star(arg);
+                                }
                             }
-                            Operation::Star(arg) => {
-                                propogate_star(arg);
-                            }
-                        },
+                        }
                     }
                 }
                 c => {
@@ -436,6 +464,32 @@ mod tests {
                 parenthesized: true,
             },
         )));
+
+        assert_eq!(expected, res)
+    }
+
+    #[test]
+    fn non_greedy_star() {
+        let expr = "(cd)qa*";
+        let mut parser = Parser::default();
+        let res = parser.parse(expr);
+
+        let expected = OperationArg::Operation(Operation::Concat(vec![
+            OperationArg::Const {
+                expr: "cd".to_string(),
+                parenthesized: true,
+            },
+            OperationArg::Const {
+                expr: "q".to_string(),
+                parenthesized: false,
+            },
+            OperationArg::Operation(Operation::Star(Box::new(
+                OperationArg::Const {
+                    expr: "a".to_string(),
+                    parenthesized: false,
+                },
+            ))),
+        ]));
 
         assert_eq!(expected, res)
     }
