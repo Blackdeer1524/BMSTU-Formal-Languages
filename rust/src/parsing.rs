@@ -501,7 +501,7 @@ mod tests {
 
     #[test]
     fn star_simplification() {
-        let expr = "((abc)*|(bcd)*)**qa***(((abc)*)**)***";
+        let expr = "((abc)*|(bcd)*)**a***(((abc)*)**)***";
         let mut parser = Parser::default();
 
         let res = parser.parse(expr);
@@ -518,10 +518,6 @@ mod tests {
                     },
                 ])),
             ))),
-            OperationArg::Const {
-                expr: "q".to_string(),
-                parenthesized: false,
-            },
             OperationArg::Operation(Operation::Star(Box::new(
                 OperationArg::Const {
                     expr: "a".to_string(),
@@ -531,9 +527,10 @@ mod tests {
             OperationArg::Operation(Operation::Star(Box::new(
                 OperationArg::Const {
                     expr: "abc".to_string(),
-                    parenthesized: false,
+                    parenthesized: true,
                 },
             ))),
         ]));
+        assert_eq!(expected, res);
     }
 }
