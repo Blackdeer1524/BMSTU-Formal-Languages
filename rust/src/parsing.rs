@@ -2,8 +2,15 @@ use std::{ops::Deref, str::Chars, vec};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum Operation {
-    Concat(Vec<OperationArg>),
-    Alternative(Vec<OperationArg>),
+    Concat {
+        args: Vec<OperationArg>,
+        body_accepts_empty: bool, // все элементы, кроме последнего, конкатенации принимают пустую строку
+        last_item_accepts_empty: bool, // последний элем конкатенации принимает пустую строку
+    },
+    Alternative {
+        args: Vec<OperationArg>,
+        accepts_empty: bool,
+    },
     Star(Box<OperationArg>),
 }
 
@@ -28,33 +35,42 @@ fn concat_const(
         if node_opt.is_some() {
             let node_variant = node_opt.as_mut().unwrap();
             match node_variant {
-                OperationArg::Const { .. } => {
-                    // TODO: здесь можно упростить
-                    *node_variant =
-                        OperationArg::Operation(Operation::Concat(vec![
+                OperationArg::Const { expr, .. } => {
+                    let borrow_checked_workaround = expr.clone();
+                    *node_variant = OperationArg::Operation(Operation::Concat {
+                        args: vec![
                             node_variant.deref().clone(),
                             OperationArg::Const {
-                                expr: cur_regex.clone(),
+                                expr: format!(
+                                    "{}{}",
+                                    borrow_checked_workaround, cur_regex
+                                ),
                                 parenthesized: false,
                             },
-                        ]))
+                        ],
+                        accepts_empty: false,
+                    })
                 }
                 OperationArg::Operation(operation) => match operation {
-                    Operation::Concat(args) => {
+                    Operation::Concat { args, accepts_empty } => {
                         args.push(OperationArg::Const {
                             expr: cur_regex.clone(),
                             parenthesized: false,
                         });
+                        *accepts_empty = false;
                     }
-                    Operation::Alternative(_) | Operation::Star(_) => {
+                    Operation::Alternative { .. } | Operation::Star { .. } => {
                         *node_variant =
-                            OperationArg::Operation(Operation::Concat(vec![
-                                node_variant.deref().clone(),
-                                OperationArg::Const {
-                                    expr: cur_regex.clone(),
-                                    parenthesized: false,
-                                },
-                            ]))
+                            OperationArg::Operation(Operation::Concat {
+                                args: vec![
+                                    node_variant.deref().clone(),
+                                    OperationArg::Const {
+                                        expr: cur_regex.clone(),
+                                        parenthesized: false,
+                                    },
+                                ],
+                                accepts_empty: false,
+                            })
                     }
                 },
             }
@@ -75,8 +91,12 @@ fn propogate_star(outer: &mut OperationArg) {
     match outer {
         OperationArg::Const { .. } => (),
         OperationArg::Operation(op) => match op {
-            Operation::Concat(_) => (),
-            Operation::Alternative(args) => {
+            Operation::Concat { args, accepts_empty } => {
+                if *accepts_empty {
+                    args.iter_mut().for_each(propogate_star)
+                }
+            }
+            Operation::Alternative { args, .. } => {
                 args.iter_mut().for_each(propogate_star)
             }
             Operation::Star(arg) => {
@@ -108,16 +128,25 @@ impl<'a> Parser<'a> {
                 '(' => {
                     self.advance();
                     let mut subexpr = self.expect_alternative();
-                    if let OperationArg::Const {
-                        expr,
-                        parenthesized: _,
-                    } = subexpr
+                    if let OperationArg::Const { expr, parenthesized: _ } =
+                        subexpr
                     {
-                        subexpr = OperationArg::Const {
-                            expr,
-                            parenthesized: true,
-                        }
+                        subexpr =
+                            OperationArg::Const { expr, parenthesized: true }
                     }
+                    let subexpr_accepts_empty = match &subexpr {
+                        OperationArg::Const { .. } => false,
+                        OperationArg::Operation(op) => match op {
+                            Operation::Concat { args, accepts_empty } => {
+                                *accepts_empty
+                            }
+                            Operation::Alternative { args, accepts_empty } => {
+                                *accepts_empty
+                            }
+                            Operation::Star(_) => true,
+                        },
+                    };
+
                     self.consume(')');
 
                     if !concat_const(&mut node_opt, &mut cur_regex)
@@ -131,25 +160,31 @@ impl<'a> Parser<'a> {
                     match node_variant {
                         OperationArg::Operation(operation_type) => {
                             match operation_type {
-                                Operation::Concat(operands) => {
-                                    operands.push(subexpr);
+                                Operation::Concat { args, accepts_empty } => {
+                                    args.push(subexpr);
+                                    *accepts_empty &= subexpr_accepts_empty;
                                 }
-                                Operation::Alternative(_)
+                                Operation::Alternative { .. }
                                 | Operation::Star(_) => {
                                     *node_variant = OperationArg::Operation(
-                                        Operation::Concat(vec![
-                                            node_variant.clone(),
-                                            subexpr,
-                                        ]),
+                                        Operation::Concat {
+                                            args: vec![
+                                                node_variant.clone(),
+                                                subexpr,
+                                            ],
+                                            accepts_empty:
+                                                subexpr_accepts_empty,
+                                        },
                                     );
                                 }
                             }
                         }
                         OperationArg::Const { .. } => {
                             *node_variant =
-                                OperationArg::Operation(Operation::Concat(
-                                    vec![node_variant.clone(), subexpr],
-                                ));
+                                OperationArg::Operation(Operation::Concat {
+                                    args: vec![node_variant.clone(), subexpr],
+                                    accepts_empty: false,
+                                });
                         }
                     }
                 }
@@ -162,10 +197,7 @@ impl<'a> Parser<'a> {
 
                     let node_variant = node_opt.as_mut().unwrap();
                     match node_variant {
-                        OperationArg::Const {
-                            expr,
-                            parenthesized,
-                        } => {
+                        OperationArg::Const { expr, parenthesized } => {
                             if *parenthesized {
                                 *node_variant =
                                     OperationArg::Operation(Operation::Star(
@@ -176,73 +208,76 @@ impl<'a> Parser<'a> {
                                     ))
                             } else {
                                 let last = expr.pop().unwrap();
-                                *node_variant = OperationArg::Operation(
-                                    Operation::Concat(vec![
-                                        OperationArg::Const {
-                                            expr: expr.clone(),
-                                            parenthesized: false,
-                                        },
-                                        OperationArg::Operation(
-                                            Operation::Star(Box::new(
-                                                OperationArg::Const {
-                                                    expr: last.to_string(),
-                                                    parenthesized: false,
-                                                },
-                                            )),
-                                        ),
-                                    ]),
-                                )
+                                *node_variant =
+                                    OperationArg::Operation(Operation::Concat {
+                                        args: vec![
+                                            OperationArg::Const {
+                                                expr: expr.clone(),
+                                                parenthesized: false,
+                                            },
+                                            OperationArg::Operation(
+                                                Operation::Star(Box::new(
+                                                    OperationArg::Const {
+                                                        expr: last.to_string(),
+                                                        parenthesized: false,
+                                                    },
+                                                )),
+                                            ),
+                                        ],
+                                        accepts_empty: false,
+                                    })
                             }
                         }
-                        OperationArg::Operation(op) => {
-                            match op {
-                                Operation::Concat(args) => {
-                                    let last = args.last_mut().unwrap();
-                                    match last {
-                                        OperationArg::Const {
-                                            expr,
-                                            parenthesized,
-                                        } => {
-                                            if *parenthesized || expr.len() == 1
-                                            {
-                                                *last = OperationArg::Operation(
-                                                    Operation::Star(Box::new(
-                                                        last.deref().clone(),
-                                                    )),
-                                                )
-                                            } else {
-                                                let last_char =
-                                                    expr.pop().unwrap();
-                                                args.push(OperationArg::Operation(Operation::Star(
-                                                    Box::new(OperationArg::Const { expr: last_char.to_string(), parenthesized: false })
-                                                )));
-                                            }
-                                        }
-                                        OperationArg::Operation(_) => {
-                                            propogate_star(last);
+                        OperationArg::Operation(op) => match op {
+                            Operation::Concat { args, accepts_empty } => {
+                                let last = args.last_mut().unwrap();
+                                match last {
+                                    OperationArg::Const {
+                                        expr,
+                                        parenthesized,
+                                    } => {
+                                        if *parenthesized || expr.len() == 1 {
                                             *last = OperationArg::Operation(
                                                 Operation::Star(Box::new(
                                                     last.deref().clone(),
                                                 )),
-                                            );
+                                            )
+                                        } else {
+                                            let last_char = expr.pop().unwrap();
+                                            args.push(OperationArg::Operation(
+                                                Operation::Star(Box::new(
+                                                    OperationArg::Const {
+                                                        expr: last_char
+                                                            .to_string(),
+                                                        parenthesized: false,
+                                                    },
+                                                )),
+                                            ));
                                         }
                                     }
-                                }
-                                Operation::Alternative(args) => {
-                                    args.iter_mut().for_each(propogate_star);
-                                    *node_variant = OperationArg::Operation(
-                                        Operation::Star(Box::new(
-                                            OperationArg::Operation(
-                                                op.deref().clone(),
-                                            ),
-                                        )),
-                                    )
-                                }
-                                Operation::Star(arg) => {
-                                    propogate_star(arg);
+                                    OperationArg::Operation(_) => {
+                                        propogate_star(last);
+                                        *last = OperationArg::Operation(
+                                            Operation::Star(Box::new(
+                                                last.deref().clone(),
+                                            )),
+                                        );
+                                    }
                                 }
                             }
-                        }
+                            Operation::Alternative { args, accepts_empty } => {
+                                args.iter_mut().for_each(propogate_star);
+                                *node_variant =
+                                    OperationArg::Operation(Operation::Star(
+                                        Box::new(OperationArg::Operation(
+                                            op.deref().clone(),
+                                        )),
+                                    ))
+                            }
+                            Operation::Star(arg) => {
+                                propogate_star(arg);
+                            }
+                        },
                     }
                 }
                 c => {
@@ -263,16 +298,29 @@ impl<'a> Parser<'a> {
         }
         self.advance();
 
+        let mut alternative_accepts_empty = false;
         let mut children = vec![node];
         loop {
-            let subexpr = self.expect_regex();
-            if let OperationArg::Operation(Operation::Alternative(mut x)) =
-                subexpr
-            {
-                children.append(&mut x);
-            } else {
-                children.push(subexpr);
-            }
+            let mut subexpr = self.expect_regex();
+            match &mut subexpr {
+                OperationArg::Const { .. } => {
+                    children.push(subexpr);
+                }
+                OperationArg::Operation(op) => match op {
+                    Operation::Concat { args, accepts_empty } => {
+                        alternative_accepts_empty |= *accepts_empty;
+                        children.push(subexpr);
+                    }
+                    Operation::Alternative { args, accepts_empty } => {
+                        alternative_accepts_empty |= *accepts_empty;
+                        children.append(args);
+                    }
+                    Operation::Star(_) => {
+                        alternative_accepts_empty = true;
+                        children.push(subexpr);
+                    }
+                },
+            };
 
             if !self.expect('|') {
                 break;
@@ -280,7 +328,11 @@ impl<'a> Parser<'a> {
             self.advance();
         }
 
-        OperationArg::Operation(Operation::Alternative(children))
+        // TODO: ACI
+        OperationArg::Operation(Operation::Alternative {
+            args: children,
+            accepts_empty: alternative_accepts_empty,
+        })
     }
 
     fn report(&self, message: &str) -> ! {
@@ -364,16 +416,19 @@ mod tests {
         let mut parser = Parser::default();
 
         let res = parser.parse(expr);
-        let expected = OperationArg::Operation(Operation::Alternative(vec![
-            OperationArg::Const {
-                expr: "abc".to_string(),
-                parenthesized: false,
-            },
-            OperationArg::Const {
-                expr: "cde".to_string(),
-                parenthesized: false,
-            },
-        ]));
+        let expected = OperationArg::Operation(Operation::Alternative {
+            args: vec![
+                OperationArg::Const {
+                    expr: "abc".to_string(),
+                    parenthesized: false,
+                },
+                OperationArg::Const {
+                    expr: "cde".to_string(),
+                    parenthesized: false,
+                },
+            ],
+            accepts_empty: false,
+        });
         assert_eq!(expected, res);
     }
 
@@ -383,20 +438,23 @@ mod tests {
         let mut parser = Parser::default();
 
         let res = parser.parse(expr);
-        let expected = OperationArg::Operation(Operation::Concat(vec![
-            OperationArg::Const {
-                expr: "abc".to_string(),
-                parenthesized: false,
-            },
-            OperationArg::Const {
-                expr: "cde".to_string(),
-                parenthesized: true,
-            },
-            OperationArg::Const {
-                expr: "efg".to_string(),
-                parenthesized: false,
-            },
-        ]));
+        let expected = OperationArg::Operation(Operation::Concat {
+            args: vec![
+                OperationArg::Const {
+                    expr: "abc".to_string(),
+                    parenthesized: false,
+                },
+                OperationArg::Const {
+                    expr: "cde".to_string(),
+                    parenthesized: true,
+                },
+                OperationArg::Const {
+                    expr: "efg".to_string(),
+                    parenthesized: false,
+                },
+            ],
+            accepts_empty: false,
+        });
         assert_eq!(expected, res);
     }
 
@@ -421,18 +479,21 @@ mod tests {
         let mut parser = Parser::default();
 
         let res = parser.parse(expr);
-        let expected = OperationArg::Operation(Operation::Concat(vec![
-            OperationArg::Operation(Operation::Star(Box::new(
+        let expected = OperationArg::Operation(Operation::Concat {
+            args: vec![
+                OperationArg::Operation(Operation::Star(Box::new(
+                    OperationArg::Const {
+                        expr: "abc".to_string(),
+                        parenthesized: true,
+                    },
+                ))),
                 OperationArg::Const {
-                    expr: "abc".to_string(),
+                    expr: "cde".to_string(),
                     parenthesized: true,
                 },
-            ))),
-            OperationArg::Const {
-                expr: "cde".to_string(),
-                parenthesized: true,
-            },
-        ]));
+            ],
+            accepts_empty: false,
+        });
         assert_eq!(expected, res);
     }
 
@@ -442,20 +503,23 @@ mod tests {
         let mut parser = Parser::default();
 
         let res = parser.parse(expr);
-        let expected = OperationArg::Operation(Operation::Concat(vec![
-            OperationArg::Operation(Operation::Star(Box::new(
-                OperationArg::Const {
-                    expr: "ab".to_string(),
-                    parenthesized: true,
-                },
-            ))),
-            OperationArg::Operation(Operation::Star(Box::new(
-                OperationArg::Const {
-                    expr: "ed".to_string(),
-                    parenthesized: true,
-                },
-            ))),
-        ]));
+        let expected = OperationArg::Operation(Operation::Concat {
+            args: vec![
+                OperationArg::Operation(Operation::Star(Box::new(
+                    OperationArg::Const {
+                        expr: "ab".to_string(),
+                        parenthesized: true,
+                    },
+                ))),
+                OperationArg::Operation(Operation::Star(Box::new(
+                    OperationArg::Const {
+                        expr: "ed".to_string(),
+                        parenthesized: true,
+                    },
+                ))),
+            ],
+            accepts_empty: true,
+        });
         assert_eq!(expected, res);
     }
 
@@ -481,22 +545,25 @@ mod tests {
         let mut parser = Parser::default();
         let res = parser.parse(expr);
 
-        let expected = OperationArg::Operation(Operation::Concat(vec![
-            OperationArg::Const {
-                expr: "cd".to_string(),
-                parenthesized: true,
-            },
-            OperationArg::Const {
-                expr: "q".to_string(),
-                parenthesized: false,
-            },
-            OperationArg::Operation(Operation::Star(Box::new(
+        let expected = OperationArg::Operation(Operation::Concat {
+            args: vec![
                 OperationArg::Const {
-                    expr: "a".to_string(),
+                    expr: "cd".to_string(),
+                    parenthesized: true,
+                },
+                OperationArg::Const {
+                    expr: "q".to_string(),
                     parenthesized: false,
                 },
-            ))),
-        ]));
+                OperationArg::Operation(Operation::Star(Box::new(
+                    OperationArg::Const {
+                        expr: "a".to_string(),
+                        parenthesized: false,
+                    },
+                ))),
+            ],
+            accepts_empty: false,
+        });
 
         assert_eq!(expected, res)
     }
@@ -507,20 +574,23 @@ mod tests {
         let mut parser = Parser::default();
         let res = parser.parse(expr);
 
-        let expected = OperationArg::Operation(Operation::Concat(vec![
-            OperationArg::Operation(Operation::Star(Box::new(
-                OperationArg::Const {
-                    expr: "abc".to_string(),
-                    parenthesized: true,
-                },
-            ))),
-            OperationArg::Operation(Operation::Star(Box::new(
-                OperationArg::Const {
-                    expr: "cde".to_string(),
-                    parenthesized: true,
-                },
-            ))),
-        ]));
+        let expected = OperationArg::Operation(Operation::Concat {
+            args: vec![
+                OperationArg::Operation(Operation::Star(Box::new(
+                    OperationArg::Const {
+                        expr: "abc".to_string(),
+                        parenthesized: true,
+                    },
+                ))),
+                OperationArg::Operation(Operation::Star(Box::new(
+                    OperationArg::Const {
+                        expr: "cde".to_string(),
+                        parenthesized: true,
+                    },
+                ))),
+            ],
+            accepts_empty: true,
+        });
 
         assert_eq!(expected, res);
     }
@@ -531,32 +601,41 @@ mod tests {
         let mut parser = Parser::default();
 
         let res = parser.parse(expr);
-        let expected = OperationArg::Operation(Operation::Alternative(vec![
-            OperationArg::Operation(Operation::Concat(vec![
-                OperationArg::Operation(Operation::Star(Box::new(
-                    OperationArg::Const {
-                        expr: "abc".to_string(),
-                        parenthesized: true,
-                    },
-                ))),
-                OperationArg::Operation(Operation::Star(Box::new(
-                    OperationArg::Operation(Operation::Alternative(vec![
-                        OperationArg::Const {
-                            expr: "cde".to_string(),
-                            parenthesized: true,
-                        },
-                        OperationArg::Const {
-                            expr: "edf".to_string(),
-                            parenthesized: true,
-                        },
-                    ])),
-                ))),
-            ])),
-            OperationArg::Const {
-                expr: "qrp".to_string(),
-                parenthesized: true,
-            },
-        ]));
+        let expected = OperationArg::Operation(Operation::Alternative {
+            args: vec![
+                OperationArg::Operation(Operation::Concat {
+                    args: vec![
+                        OperationArg::Operation(Operation::Star(Box::new(
+                            OperationArg::Const {
+                                expr: "abc".to_string(),
+                                parenthesized: true,
+                            },
+                        ))),
+                        OperationArg::Operation(Operation::Star(Box::new(
+                            OperationArg::Operation(Operation::Alternative {
+                                args: vec![
+                                    OperationArg::Const {
+                                        expr: "cde".to_string(),
+                                        parenthesized: true,
+                                    },
+                                    OperationArg::Const {
+                                        expr: "edf".to_string(),
+                                        parenthesized: true,
+                                    },
+                                ],
+                                accepts_empty: false,
+                            }),
+                        ))),
+                    ],
+                    accepts_empty: true,
+                }),
+                OperationArg::Const {
+                    expr: "qrp".to_string(),
+                    parenthesized: true,
+                },
+            ],
+            accepts_empty: true,
+        });
         assert_eq!(expected, res);
     }
 
@@ -566,32 +645,38 @@ mod tests {
         let mut parser = Parser::default();
 
         let res = parser.parse(expr);
-        let expected = OperationArg::Operation(Operation::Concat(vec![
-            OperationArg::Operation(Operation::Star(Box::new(
-                OperationArg::Operation(Operation::Alternative(vec![
+        let expected = OperationArg::Operation(Operation::Concat {
+            args: vec![
+                OperationArg::Operation(Operation::Star(Box::new(
+                    OperationArg::Operation(Operation::Alternative {
+                        args: vec![
+                            OperationArg::Const {
+                                expr: "abc".to_string(),
+                                parenthesized: true,
+                            },
+                            OperationArg::Const {
+                                expr: "bcd".to_string(),
+                                parenthesized: true,
+                            },
+                        ],
+                        accepts_empty: true,
+                    }),
+                ))),
+                OperationArg::Operation(Operation::Star(Box::new(
+                    OperationArg::Const {
+                        expr: "a".to_string(),
+                        parenthesized: false,
+                    },
+                ))),
+                OperationArg::Operation(Operation::Star(Box::new(
                     OperationArg::Const {
                         expr: "abc".to_string(),
                         parenthesized: true,
                     },
-                    OperationArg::Const {
-                        expr: "bcd".to_string(),
-                        parenthesized: true,
-                    },
-                ])),
-            ))),
-            OperationArg::Operation(Operation::Star(Box::new(
-                OperationArg::Const {
-                    expr: "a".to_string(),
-                    parenthesized: false,
-                },
-            ))),
-            OperationArg::Operation(Operation::Star(Box::new(
-                OperationArg::Const {
-                    expr: "abc".to_string(),
-                    parenthesized: true,
-                },
-            ))),
-        ]));
+                ))),
+            ],
+            accepts_empty: true,
+        });
         assert_eq!(expected, res);
     }
 }
