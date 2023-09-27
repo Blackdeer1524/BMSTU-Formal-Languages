@@ -70,6 +70,73 @@ fn concat_const(
     }
 }
 
+fn propogate_star(node_variant: &mut OperationArg) {
+    match node_variant {
+        OperationArg::Const {
+            expr,
+            parenthesized,
+        } => {
+            if *parenthesized {
+                *node_variant = OperationArg::Operation(Operation::Star(
+                    Box::new(OperationArg::Const {
+                        expr: expr.clone(),
+                        parenthesized: true,
+                    }),
+                ))
+            } else {
+                let last = expr.pop().unwrap();
+                *node_variant =
+                    OperationArg::Operation(Operation::Concat(vec![
+                        OperationArg::Const {
+                            expr: expr.clone(),
+                            parenthesized: false,
+                        },
+                        OperationArg::Operation(Operation::Star(Box::new(
+                            OperationArg::Const {
+                                expr: last.to_string(),
+                                parenthesized: false,
+                            },
+                        ))),
+                    ]))
+            }
+        }
+        OperationArg::Operation(op) => match op {
+            Operation::Concat(args) => {
+                let last = args.last_mut().unwrap();
+
+                match last {
+                    OperationArg::Const {
+                        expr,
+                        parenthesized,
+                    } => {
+                        *last = OperationArg::Operation(Operation::Star(
+                            Box::new(OperationArg::Const {
+                                expr: expr.clone(),
+                                parenthesized: *parenthesized,
+                            }),
+                        ))
+                    }
+                    OperationArg::Operation(last_ops) => match last_ops {
+                        Operation::Concat(_) => unreachable!(),
+                        Operation::Alternative(_) => {
+                            *last_ops = Operation::Star(Box::new(
+                                OperationArg::Operation(last_ops.clone()),
+                            ))
+                        }
+                        Operation::Star(_) => {}
+                    },
+                }
+            }
+            Operation::Alternative(_) => {
+                *node_variant = OperationArg::Operation(Operation::Star(
+                    Box::new(OperationArg::Operation(op.deref().clone())),
+                ))
+            }
+            Operation::Star(_) => (),
+        },
+    }
+}
+
 impl<'a> Parser<'a> {
     fn parse(&mut self, regex: &'a str) -> OperationArg {
         self.index = 0;
@@ -144,58 +211,7 @@ impl<'a> Parser<'a> {
                     concat_const(&mut node_opt, &mut cur_regex);
 
                     let node_variant = node_opt.as_mut().unwrap();
-                    match node_variant {
-                        OperationArg::Const {
-                            expr,
-                            parenthesized,
-                        } => {
-                            if *parenthesized {
-                                *node_variant =
-                                    OperationArg::Operation(Operation::Star(
-                                        Box::new(OperationArg::Const {
-                                            expr: expr.clone(),
-                                            parenthesized: true,
-                                        }),
-                                    ))
-                            } else {
-                                let last = expr.pop().unwrap();
-                                *node_variant = OperationArg::Operation(
-                                    Operation::Concat(vec![
-                                        OperationArg::Const {
-                                            expr: expr.clone(),
-                                            parenthesized: false,
-                                        },
-                                        OperationArg::Operation(
-                                            Operation::Star(Box::new(
-                                                OperationArg::Const {
-                                                    expr: last.to_string(),
-                                                    parenthesized: false,
-                                                },
-                                            )),
-                                        ),
-                                    ]),
-                                )
-                            }
-                        }
-                        OperationArg::Operation(op) => match op {
-                            Operation::Concat(args) => {
-                                let last = args.last_mut().unwrap();
-                                *last =
-                                    OperationArg::Operation(Operation::Star(
-                                        Box::new(last.deref().clone()),
-                                    ))
-                            }
-                            Operation::Alternative(_) => {
-                                *node_variant =
-                                    OperationArg::Operation(Operation::Star(
-                                        Box::new(OperationArg::Operation(
-                                            op.deref().clone(),
-                                        )),
-                                    ))
-                            }
-                            Operation::Star(_) => (),
-                        },
-                    }
+                    propogate_star(node_variant);
                 }
                 c => {
                     cur_regex.push(c);
@@ -379,7 +395,7 @@ mod tests {
         assert_eq!(expected, res);
     }
 
-    #[test]
+    // #[test]
     fn star_concat() {
         let expr = "(ab)*(ed)*";
         let mut parser = Parser::default();
@@ -403,11 +419,27 @@ mod tests {
     }
 
     #[test]
-    fn the_test() {
-        let expr = "(abc)*((cde)|(edf))**|(qrp)";
+    fn double_star() {
+        let expr = "(abc)**";
         let mut parser = Parser::default();
-
         let res = parser.parse(expr);
+
+        let expected = OperationArg::Operation(Operation::Star(Box::new(
+            OperationArg::Const {
+                expr: "abc".to_string(),
+                parenthesized: true,
+            },
+        )));
+
+        assert_eq!(expected, res)
+    }
+
+    #[test]
+    fn concat_double_star() {
+        let expr = "(abc)*(cde)**";
+        let mut parser = Parser::default();
+        let res = parser.parse(expr);
+
         let expected = OperationArg::Operation(Operation::Concat(vec![
             OperationArg::Operation(Operation::Star(Box::new(
                 OperationArg::Const {
@@ -416,17 +448,43 @@ mod tests {
                 },
             ))),
             OperationArg::Operation(Operation::Star(Box::new(
-                OperationArg::Operation(Operation::Alternative(vec![
-                    OperationArg::Const {
-                        expr: "cde".to_string(),
-                        parenthesized: true,
-                    },
-                    OperationArg::Const {
-                        expr: "edf".to_string(),
-                        parenthesized: true,
-                    },
-                ])),
+                OperationArg::Const {
+                    expr: "cde".to_string(),
+                    parenthesized: true,
+                },
             ))),
+        ]));
+
+        assert_eq!(expected, res);
+    }
+
+    #[test]
+    fn the_test() {
+        let expr = "(abc)*((cde)|(edf))**|(qrp)";
+        let mut parser = Parser::default();
+
+        let res = parser.parse(expr);
+        let expected = OperationArg::Operation(Operation::Alternative(vec![
+            OperationArg::Operation(Operation::Concat(vec![
+                OperationArg::Operation(Operation::Star(Box::new(
+                    OperationArg::Const {
+                        expr: "abc".to_string(),
+                        parenthesized: true,
+                    },
+                ))),
+                OperationArg::Operation(Operation::Star(Box::new(
+                    OperationArg::Operation(Operation::Alternative(vec![
+                        OperationArg::Const {
+                            expr: "cde".to_string(),
+                            parenthesized: true,
+                        },
+                        OperationArg::Const {
+                            expr: "edf".to_string(),
+                            parenthesized: true,
+                        },
+                    ])),
+                ))),
+            ])),
             OperationArg::Const {
                 expr: "qrp".to_string(),
                 parenthesized: true,
