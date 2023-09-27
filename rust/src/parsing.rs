@@ -266,7 +266,13 @@ impl<'a> Parser<'a> {
         let mut children = vec![node];
         loop {
             let subexpr = self.expect_regex();
-            children.push(subexpr);
+            if let OperationArg::Operation(Operation::Alternative(x)) = subexpr
+            {
+                children.extend(x);
+            } else {
+                children.push(subexpr);
+            }
+
             if !self.expect('|') {
                 break;
             }
