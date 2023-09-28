@@ -673,77 +673,63 @@ mod tests {
         assert_eq!(expected, res)
     }
 
-    // #[test]
-    // fn concat_double_star() {
-    //     let expr = "(abc)*(cde)**";
-    //     let mut parser = Parser::default();
-    //     let res = parser.parse(expr);
-    //
-    //     let expected = OperationArg::Operation(Operation::Concat {
-    //         args: vec![
-    //             OperationArg::Operation(Operation::Star(Box::new(
-    //                 OperationArg::Const {
-    //                     expr: "abc".to_string(),
-    //                     parenthesized: true,
-    //                 },
-    //             ))),
-    //             OperationArg::Operation(Operation::Star(Box::new(
-    //                 OperationArg::Const {
-    //                     expr: "cde".to_string(),
-    //                     parenthesized: true,
-    //                 },
-    //             ))),
-    //         ],
-    //         accepts_empty: true,
-    //     });
-    //
-    //     assert_eq!(expected, res);
-    // }
-    //
-    // #[test]
-    // fn the_test() {
-    //     let expr = "(abc)*((cde)|(edf))**|(qrp)";
-    //     let mut parser = Parser::default();
-    //
-    //     let res = parser.parse(expr);
-    //     let expected = OperationArg::Operation(Operation::Alternative {
-    //         args: vec![
-    //             OperationArg::Operation(Operation::Concat {
-    //                 args: vec![
-    //                     OperationArg::Operation(Operation::Star(Box::new(
-    //                         OperationArg::Const {
-    //                             expr: "abc".to_string(),
-    //                             parenthesized: true,
-    //                         },
-    //                     ))),
-    //                     OperationArg::Operation(Operation::Star(Box::new(
-    //                         OperationArg::Operation(Operation::Alternative {
-    //                             args: vec![
-    //                                 OperationArg::Const {
-    //                                     expr: "cde".to_string(),
-    //                                     parenthesized: true,
-    //                                 },
-    //                                 OperationArg::Const {
-    //                                     expr: "edf".to_string(),
-    //                                     parenthesized: true,
-    //                                 },
-    //                             ],
-    //                             accepts_empty: false,
-    //                         }),
-    //                     ))),
-    //                 ],
-    //                 accepts_empty: true,
-    //             }),
-    //             OperationArg::Const {
-    //                 expr: "qrp".to_string(),
-    //                 parenthesized: true,
-    //             },
-    //         ],
-    //         accepts_empty: true,
-    //     });
-    //     assert_eq!(expected, res);
-    // }
-    //
+    #[test]
+    fn concat_double_star() {
+        let expr = "(abc)*(cde)**";
+        let mut parser = Parser::default();
+        let res = parser.parse(expr);
+
+        let expected = ParsingResult::Concat {
+            args: vec![
+                ConcatArgs::Star(Box::new(StarArg::Regex("abc".to_string()))),
+                ConcatArgs::Star(Box::new(StarArg::Regex("cde".to_string()))),
+            ],
+            body_accepts_empty: true,
+            tail_accepts_empty: true,
+            parenthesized: false,
+        };
+
+        assert_eq!(expected, res);
+    }
+
+    #[test]
+    fn the_test() {
+        let expr = "(abc)*((cde)|(edf))**|(qrp)";
+        let mut parser = Parser::default();
+
+        let res = parser.parse(expr);
+        let expected = ParsingResult::Alt {
+            args: vec![
+                AltArgs::Concat {
+                    args: vec![
+                        ConcatArgs::Star(Box::new(StarArg::Regex(
+                            "abc".to_string(),
+                        ))),
+                        ConcatArgs::Star(Box::new(StarArg::Alt {
+                            args: vec![
+                                AltArgs::Regex {
+                                    arg: "cde".to_string(),
+                                    parenthesized: true,
+                                },
+                                AltArgs::Regex {
+                                    arg: "edf".to_string(),
+                                    parenthesized: true,
+                                },
+                            ],
+                            accepts_empty: false,
+                        })),
+                    ],
+                    body_accepts_empty: true,
+                    tail_accepts_empty: true,
+                },
+                AltArgs::Regex { arg: "qrp".to_string(), parenthesized: true },
+            ],
+            accepts_empty: false,
+        };
+
+        assert_eq!(expected, res);
+    }
+
     // #[test]
     // fn star_simplification() {
     //     let expr = "((abc)*|(bcd)*)**a***(((abc)*)**)***";
