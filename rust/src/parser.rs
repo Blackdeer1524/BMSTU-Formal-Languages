@@ -1,10 +1,10 @@
 use std::{str::Chars, usize, vec};
 
-#[derive(Debug, PartialEq, Eq)]
-enum AltArgs {
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum AltArg {
     Concat {
         // Нам всё равно в какой форме конкат: в скобках или нет
-        args: Vec<ConcatArgs>,
+        args: Vec<ConcatArg>,
         body_accepts_empty: bool,
         tail_accepts_empty: bool,
     },
@@ -15,16 +15,16 @@ enum AltArgs {
     },
 }
 
-#[derive(Debug, PartialEq, Eq)]
-enum ConcatArgs {
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum ConcatArg {
     Concat {
         // конкат внутри конката может быть ТОЛЬКО в скобках
-        args: Vec<ConcatArgs>,
+        args: Vec<ConcatArg>,
         body_accepts_empty: bool,
         tail_accepts_empty: bool,
     },
     Alt {
-        args: Vec<AltArgs>,
+        args: Vec<AltArg>,
         accepts_empty: bool,
     },
     Star(Box<StarArg>),
@@ -34,15 +34,15 @@ enum ConcatArgs {
     },
 }
 
-#[derive(Debug, PartialEq, Eq)]
-enum StarArg {
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum StarArg {
     Alt {
-        args: Vec<AltArgs>,
+        args: Vec<AltArg>,
         accepts_empty: bool,
     },
     Concat {
         // конкат внутри звезды может быть только в скобках
-        args: Vec<ConcatArgs>,
+        args: Vec<ConcatArg>,
         body_accepts_empty: bool,
         tail_accepts_empty: bool,
     },
@@ -50,20 +50,20 @@ enum StarArg {
 }
 
 #[derive(Default)]
-struct Parser<'a> {
+pub struct Parser<'a> {
     index: usize,
     expr_iter: Option<Chars<'a>>,
     next_char: Option<char>,
 }
 
 #[derive(Debug, PartialEq, Eq)]
-enum ParsingResult {
+pub enum ParsingResult {
     Alt {
-        args: Vec<AltArgs>,
+        args: Vec<AltArg>,
         accepts_empty: bool,
     },
     Concat {
-        args: Vec<ConcatArgs>,
+        args: Vec<ConcatArg>,
         body_accepts_empty: bool,
         tail_accepts_empty: bool,
         parenthesized: bool,
@@ -84,7 +84,7 @@ impl<'a> Parser<'a> {
     }
 
     fn expect_alternative(&mut self) -> ParsingResult {
-        let mut alt_args: Vec<AltArgs> = vec![];
+        let mut alt_args: Vec<AltArg> = vec![];
         let mut alt_accepts_empty = true;
 
         let mut last_concat_parens = false;
@@ -102,7 +102,7 @@ impl<'a> Parser<'a> {
                     parenthesized,
                 } => {
                     last_concat_parens = parenthesized;
-                    alt_args.push(AltArgs::Concat {
+                    alt_args.push(AltArg::Concat {
                         args,
                         body_accepts_empty,
                         tail_accepts_empty,
@@ -111,10 +111,10 @@ impl<'a> Parser<'a> {
                         body_accepts_empty & tail_accepts_empty;
                 }
                 ParsingResult::Star(arg) => {
-                    alt_args.push(AltArgs::Star(arg));
+                    alt_args.push(AltArg::Star(arg));
                 }
                 ParsingResult::Regex { arg, parenthesized } => {
-                    alt_args.push(AltArgs::Regex { arg, parenthesized });
+                    alt_args.push(AltArg::Regex { arg, parenthesized });
                     alt_accepts_empty = false;
                 }
             }
@@ -131,7 +131,7 @@ impl<'a> Parser<'a> {
             }
         } else if alt_args.len() == 1 {
             match alt_args.pop().unwrap() {
-                AltArgs::Concat {
+                AltArg::Concat {
                     args,
                     body_accepts_empty,
                     tail_accepts_empty,
@@ -141,8 +141,8 @@ impl<'a> Parser<'a> {
                     tail_accepts_empty,
                     parenthesized: last_concat_parens,
                 },
-                AltArgs::Star(arg) => ParsingResult::Star(arg),
-                AltArgs::Regex { arg, parenthesized } => {
+                AltArg::Star(arg) => ParsingResult::Star(arg),
+                AltArg::Regex { arg, parenthesized } => {
                     ParsingResult::Regex { arg, parenthesized }
                 }
             }
@@ -153,7 +153,7 @@ impl<'a> Parser<'a> {
 
     // UNARY ::= (CONCAT "*"+)* CONCAT
     fn expect_unary(&mut self) -> ParsingResult {
-        let mut unary_args: Vec<ConcatArgs> = vec![];
+        let mut unary_args: Vec<ConcatArg> = vec![];
         let mut unary_body_accepts_empty: bool = true;
         let mut unary_tail_accepts_empty: bool = true;
         loop {
@@ -167,8 +167,7 @@ impl<'a> Parser<'a> {
                     ParsingResult::Alt { args, accepts_empty } => {
                         unary_body_accepts_empty &= unary_tail_accepts_empty;
                         unary_tail_accepts_empty = accepts_empty;
-                        unary_args
-                            .push(ConcatArgs::Alt { args, accepts_empty });
+                        unary_args.push(ConcatArg::Alt { args, accepts_empty });
                     }
                     ParsingResult::Concat {
                         args,
@@ -181,7 +180,7 @@ impl<'a> Parser<'a> {
                                 unary_tail_accepts_empty;
                             unary_tail_accepts_empty =
                                 body_accepts_empty & tail_accepts_empty;
-                            unary_args.push(ConcatArgs::Concat {
+                            unary_args.push(ConcatArg::Concat {
                                 args,
                                 body_accepts_empty,
                                 tail_accepts_empty,
@@ -196,13 +195,13 @@ impl<'a> Parser<'a> {
                     ParsingResult::Star(arg) => {
                         unary_body_accepts_empty &= unary_tail_accepts_empty;
                         unary_tail_accepts_empty = true;
-                        unary_args.push(ConcatArgs::Star(arg))
+                        unary_args.push(ConcatArg::Star(arg))
                     }
                     ParsingResult::Regex { arg, parenthesized } => {
                         unary_body_accepts_empty &= unary_tail_accepts_empty;
                         unary_tail_accepts_empty = false;
                         unary_args
-                            .push(ConcatArgs::Regex { arg, parenthesized });
+                            .push(ConcatArg::Regex { arg, parenthesized });
                     }
                 }
                 break;
@@ -218,7 +217,7 @@ impl<'a> Parser<'a> {
             unary_tail_accepts_empty = true;
             match subexpr {
                 ParsingResult::Alt { args, accepts_empty } => {
-                    unary_args.push(ConcatArgs::Star(Box::new(StarArg::Alt {
+                    unary_args.push(ConcatArg::Star(Box::new(StarArg::Alt {
                         args,
                         accepts_empty,
                     })));
@@ -228,7 +227,7 @@ impl<'a> Parser<'a> {
                     body_accepts_empty,
                     tail_accepts_empty,
                     parenthesized: true,
-                } => unary_args.push(ConcatArgs::Star(Box::new(
+                } => unary_args.push(ConcatArg::Star(Box::new(
                     StarArg::Concat {
                         args,
                         body_accepts_empty,
@@ -245,44 +244,44 @@ impl<'a> Parser<'a> {
                         .pop()
                         .expect("Concat always have at least 2 items");
                     match last {
-                        ConcatArgs::Alt {
+                        ConcatArg::Alt {
                             args: last_args,
                             accepts_empty: last_accepts_empty,
                         } => {
                             tail_accepts_empty = true;
-                            args.push(ConcatArgs::Star(Box::new(
+                            args.push(ConcatArg::Star(Box::new(
                                 StarArg::Alt {
                                     args: last_args,
                                     accepts_empty: last_accepts_empty,
                                 },
                             )));
                         }
-                        ConcatArgs::Star(_) => (),
-                        ConcatArgs::Regex { mut arg, parenthesized } => {
+                        ConcatArg::Star(_) => (),
+                        ConcatArg::Regex { mut arg, parenthesized } => {
                             tail_accepts_empty = true;
 
                             if parenthesized || arg.len() == 1 {
-                                args.push(ConcatArgs::Star(Box::new(
+                                args.push(ConcatArg::Star(Box::new(
                                     StarArg::Regex(arg),
                                 )))
                             } else {
                                 body_accepts_empty = false;
 
                                 let last_char = arg.pop().unwrap();
-                                args.push(ConcatArgs::Regex {
+                                args.push(ConcatArg::Regex {
                                     arg,
                                     parenthesized: false,
                                 });
-                                args.push(ConcatArgs::Star(Box::new(
+                                args.push(ConcatArg::Star(Box::new(
                                     StarArg::Regex(last_char.to_string()),
                                 )));
                             }
                         }
-                        ConcatArgs::Concat {
+                        ConcatArg::Concat {
                             args: c_args,
                             body_accepts_empty,
                             tail_accepts_empty,
-                        } => args.push(ConcatArgs::Star(Box::new(
+                        } => args.push(ConcatArg::Star(Box::new(
                             StarArg::Concat {
                                 args: c_args,
                                 body_accepts_empty,
@@ -291,27 +290,27 @@ impl<'a> Parser<'a> {
                         ))),
                     };
 
-                    unary_args.push(ConcatArgs::Concat {
+                    unary_args.push(ConcatArg::Concat {
                         args,
                         body_accepts_empty,
                         tail_accepts_empty,
                     })
                 }
                 ParsingResult::Star(arg) => {
-                    unary_args.push(ConcatArgs::Star(arg))
+                    unary_args.push(ConcatArg::Star(arg))
                 }
                 ParsingResult::Regex { mut arg, parenthesized } => {
                     if parenthesized || arg.len() == 1 {
-                        unary_args.push(ConcatArgs::Star(Box::new(
+                        unary_args.push(ConcatArg::Star(Box::new(
                             StarArg::Regex(arg),
                         )))
                     } else {
                         let last_char = arg.pop().unwrap();
-                        unary_args.push(ConcatArgs::Regex {
+                        unary_args.push(ConcatArg::Regex {
                             arg,
                             parenthesized: false,
                         });
-                        unary_args.push(ConcatArgs::Star(Box::new(
+                        unary_args.push(ConcatArg::Star(Box::new(
                             StarArg::Regex(last_char.to_string()),
                         )));
                     }
@@ -327,7 +326,7 @@ impl<'a> Parser<'a> {
             }
         } else if unary_args.len() == 1 {
             match unary_args.pop().unwrap() {
-                ConcatArgs::Concat {
+                ConcatArg::Concat {
                     args,
                     body_accepts_empty,
                     tail_accepts_empty,
@@ -337,11 +336,11 @@ impl<'a> Parser<'a> {
                     tail_accepts_empty,
                     parenthesized: false,
                 },
-                ConcatArgs::Alt { args, accepts_empty } => {
+                ConcatArg::Alt { args, accepts_empty } => {
                     ParsingResult::Alt { args, accepts_empty }
                 }
-                ConcatArgs::Star(arg) => ParsingResult::Star(arg),
-                ConcatArgs::Regex { arg, parenthesized } => {
+                ConcatArg::Star(arg) => ParsingResult::Star(arg),
+                ConcatArg::Regex { arg, parenthesized } => {
                     ParsingResult::Regex { arg, parenthesized }
                 }
             }
@@ -351,7 +350,7 @@ impl<'a> Parser<'a> {
     }
 
     fn expect_concat(&mut self) -> ParsingResult {
-        let mut main_args: Vec<ConcatArgs> = vec![];
+        let mut main_args: Vec<ConcatArg> = vec![];
         let mut main_body_accepts_empty = true;
         let mut main_tail_accepts_empty = true;
 
@@ -366,7 +365,7 @@ impl<'a> Parser<'a> {
                 '(' => {
                     self.advance();
                     if !const_regex.is_empty() {
-                        main_args.push(ConcatArgs::Regex {
+                        main_args.push(ConcatArg::Regex {
                             arg: const_regex,
                             parenthesized: false,
                         });
@@ -382,7 +381,7 @@ impl<'a> Parser<'a> {
                     match subexpr {
                         ParsingResult::Alt { args, accepts_empty } => {
                             main_args
-                                .push(ConcatArgs::Alt { args, accepts_empty });
+                                .push(ConcatArg::Alt { args, accepts_empty });
                             main_body_accepts_empty &= main_tail_accepts_empty;
                             main_tail_accepts_empty = accepts_empty;
                         }
@@ -392,7 +391,7 @@ impl<'a> Parser<'a> {
                             tail_accepts_empty,
                             parenthesized: _,
                         } => {
-                            main_args.push(ConcatArgs::Concat {
+                            main_args.push(ConcatArg::Concat {
                                 args,
                                 body_accepts_empty,
                                 tail_accepts_empty,
@@ -402,12 +401,12 @@ impl<'a> Parser<'a> {
                                 body_accepts_empty & tail_accepts_empty;
                         }
                         ParsingResult::Star(arg) => {
-                            main_args.push(ConcatArgs::Star(arg));
+                            main_args.push(ConcatArg::Star(arg));
                             main_body_accepts_empty &= main_tail_accepts_empty;
                             main_tail_accepts_empty = true;
                         }
                         ParsingResult::Regex { arg, parenthesized: _ } => {
-                            main_args.push(ConcatArgs::Regex {
+                            main_args.push(ConcatArg::Regex {
                                 arg,
                                 parenthesized: true,
                             });
@@ -425,7 +424,7 @@ impl<'a> Parser<'a> {
         }
 
         if !const_regex.is_empty() {
-            main_args.push(ConcatArgs::Regex {
+            main_args.push(ConcatArg::Regex {
                 arg: const_regex,
                 parenthesized: false,
             });
@@ -442,7 +441,7 @@ impl<'a> Parser<'a> {
             }
         } else if main_args.len() == 1 {
             match main_args.pop().unwrap() {
-                ConcatArgs::Concat {
+                ConcatArg::Concat {
                     args,
                     body_accepts_empty,
                     tail_accepts_empty,
@@ -452,11 +451,11 @@ impl<'a> Parser<'a> {
                     tail_accepts_empty,
                     parenthesized: false,
                 },
-                ConcatArgs::Alt { args, accepts_empty } => {
+                ConcatArg::Alt { args, accepts_empty } => {
                     ParsingResult::Alt { args, accepts_empty }
                 }
-                ConcatArgs::Star(arg) => ParsingResult::Star(arg),
-                ConcatArgs::Regex { arg, parenthesized } => {
+                ConcatArg::Star(arg) => ParsingResult::Star(arg),
+                ConcatArg::Regex { arg, parenthesized } => {
                     ParsingResult::Regex { arg, parenthesized }
                 }
             }
@@ -531,7 +530,7 @@ mod tests {
     use std::vec;
 
     use super::Parser;
-    use super::{AltArgs, ConcatArgs, ParsingResult, StarArg};
+    use super::{AltArg, ConcatArg, ParsingResult, StarArg};
 
     #[test]
     fn basic_const_test() {
@@ -555,8 +554,8 @@ mod tests {
 
         let expected = ParsingResult::Alt {
             args: vec![
-                AltArgs::Regex { arg: "abc".to_string(), parenthesized: false },
-                AltArgs::Regex { arg: "cde".to_string(), parenthesized: false },
+                AltArg::Regex { arg: "abc".to_string(), parenthesized: false },
+                AltArg::Regex { arg: "cde".to_string(), parenthesized: false },
             ],
             accepts_empty: false,
         };
@@ -571,15 +570,15 @@ mod tests {
         let res = parser.parse(expr);
         let expected = ParsingResult::Concat {
             args: vec![
-                ConcatArgs::Regex {
+                ConcatArg::Regex {
                     arg: "abc".to_string(),
                     parenthesized: false,
                 },
-                ConcatArgs::Regex {
+                ConcatArg::Regex {
                     arg: "cde".to_string(),
                     parenthesized: true,
                 },
-                ConcatArgs::Regex {
+                ConcatArg::Regex {
                     arg: "efg".to_string(),
                     parenthesized: false,
                 },
@@ -611,8 +610,8 @@ mod tests {
         let res = parser.parse(expr);
         let expected = ParsingResult::Concat {
             args: vec![
-                ConcatArgs::Star(Box::new(StarArg::Regex("abc".to_string()))),
-                ConcatArgs::Regex {
+                ConcatArg::Star(Box::new(StarArg::Regex("abc".to_string()))),
+                ConcatArg::Regex {
                     arg: "cde".to_string(),
                     parenthesized: true,
                 },
@@ -632,8 +631,8 @@ mod tests {
         let res = parser.parse(expr);
         let expected = ParsingResult::Concat {
             args: vec![
-                ConcatArgs::Star(Box::new(StarArg::Regex("ab".to_string()))),
-                ConcatArgs::Star(Box::new(StarArg::Regex("ed".to_string()))),
+                ConcatArg::Star(Box::new(StarArg::Regex("ab".to_string()))),
+                ConcatArg::Star(Box::new(StarArg::Regex("ed".to_string()))),
             ],
             body_accepts_empty: true,
             tail_accepts_empty: true,
@@ -662,15 +661,9 @@ mod tests {
 
         let expected = ParsingResult::Concat {
             args: vec![
-                ConcatArgs::Regex {
-                    arg: "cd".to_string(),
-                    parenthesized: true,
-                },
-                ConcatArgs::Regex {
-                    arg: "q".to_string(),
-                    parenthesized: false,
-                },
-                ConcatArgs::Star(Box::new(StarArg::Regex("a".to_string()))),
+                ConcatArg::Regex { arg: "cd".to_string(), parenthesized: true },
+                ConcatArg::Regex { arg: "q".to_string(), parenthesized: false },
+                ConcatArg::Star(Box::new(StarArg::Regex("a".to_string()))),
             ],
             body_accepts_empty: false,
             tail_accepts_empty: true,
@@ -688,8 +681,8 @@ mod tests {
 
         let expected = ParsingResult::Concat {
             args: vec![
-                ConcatArgs::Star(Box::new(StarArg::Regex("abc".to_string()))),
-                ConcatArgs::Star(Box::new(StarArg::Regex("cde".to_string()))),
+                ConcatArg::Star(Box::new(StarArg::Regex("abc".to_string()))),
+                ConcatArg::Star(Box::new(StarArg::Regex("cde".to_string()))),
             ],
             body_accepts_empty: true,
             tail_accepts_empty: true,
@@ -707,16 +700,13 @@ mod tests {
 
         let expected = ParsingResult::Concat {
             args: vec![
-                ConcatArgs::Star(Box::new(StarArg::Regex("a".to_string()))),
-                ConcatArgs::Regex {
+                ConcatArg::Star(Box::new(StarArg::Regex("a".to_string()))),
+                ConcatArg::Regex {
                     arg: "abc".to_string(),
                     parenthesized: false,
                 },
-                ConcatArgs::Regex { arg: "q".to_string(), parenthesized: true },
-                ConcatArgs::Regex {
-                    arg: "r".to_string(),
-                    parenthesized: false,
-                },
+                ConcatArg::Regex { arg: "q".to_string(), parenthesized: true },
+                ConcatArg::Regex { arg: "r".to_string(), parenthesized: false },
             ],
             body_accepts_empty: false,
             tail_accepts_empty: false,
@@ -733,18 +723,18 @@ mod tests {
         let res = parser.parse(expr);
         let expected = ParsingResult::Alt {
             args: vec![
-                AltArgs::Concat {
+                AltArg::Concat {
                     args: vec![
-                        ConcatArgs::Star(Box::new(StarArg::Regex(
+                        ConcatArg::Star(Box::new(StarArg::Regex(
                             "abc".to_string(),
                         ))),
-                        ConcatArgs::Star(Box::new(StarArg::Alt {
+                        ConcatArg::Star(Box::new(StarArg::Alt {
                             args: vec![
-                                AltArgs::Regex {
+                                AltArg::Regex {
                                     arg: "cde".to_string(),
                                     parenthesized: true,
                                 },
-                                AltArgs::Regex {
+                                AltArg::Regex {
                                     arg: "edf".to_string(),
                                     parenthesized: true,
                                 },
@@ -755,7 +745,7 @@ mod tests {
                     body_accepts_empty: true,
                     tail_accepts_empty: true,
                 },
-                AltArgs::Regex { arg: "qrp".to_string(), parenthesized: true },
+                AltArg::Regex { arg: "qrp".to_string(), parenthesized: true },
             ],
             accepts_empty: false,
         };
