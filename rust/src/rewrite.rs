@@ -176,14 +176,22 @@ impl<'a> Parser<'a> {
                         tail_accepts_empty,
                         parenthesized,
                     } => {
-                        unary_body_accepts_empty &= unary_tail_accepts_empty;
-                        unary_tail_accepts_empty =
-                            body_accepts_empty & tail_accepts_empty;
-                        unary_args.push(ConcatArgs::Concat {
-                            args,
-                            body_accepts_empty,
-                            tail_accepts_empty,
-                        })
+                        if parenthesized {
+                            unary_body_accepts_empty &=
+                                unary_tail_accepts_empty;
+                            unary_tail_accepts_empty =
+                                body_accepts_empty & tail_accepts_empty;
+                            unary_args.push(ConcatArgs::Concat {
+                                args,
+                                body_accepts_empty,
+                                tail_accepts_empty,
+                            })
+                        } else {
+                            unary_args.extend(args);
+                            unary_body_accepts_empty &=
+                                unary_tail_accepts_empty & body_accepts_empty;
+                            unary_tail_accepts_empty = tail_accepts_empty;
+                        }
                     }
                     ParsingResult::Star(arg) => {
                         unary_body_accepts_empty &= unary_tail_accepts_empty;
@@ -692,6 +700,32 @@ mod tests {
         assert_eq!(expected, res);
     }
 
+    #[test]
+    fn trailing_concat_in_unary() {
+        let expr = "a*abc(q)r";
+        let mut parser = Parser::default();
+        let res = parser.parse(expr);
+
+        let expected = ParsingResult::Concat {
+            args: vec![
+                ConcatArgs::Star(Box::new(StarArg::Regex("a".to_string()))),
+                ConcatArgs::Regex {
+                    arg: "abc".to_string(),
+                    parenthesized: false,
+                },
+                ConcatArgs::Regex { arg: "q".to_string(), parenthesized: true },
+                ConcatArgs::Regex {
+                    arg: "r".to_string(),
+                    parenthesized: false,
+                },
+            ],
+            body_accepts_empty: false,
+            tail_accepts_empty: false,
+            parenthesized: false,
+        };
+
+        assert_eq!(expected, res);
+    }
     #[test]
     fn the_test() {
         let expr = "(abc)*((cde)|(edf))**|(qrp)";
