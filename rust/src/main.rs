@@ -1,6 +1,4 @@
-// mod parsing;
-// mod tests;
-mod rewrite;
+mod parser;
 
 fn main() {
     println!("Hello, world!");

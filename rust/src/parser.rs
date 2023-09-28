@@ -530,9 +530,8 @@ impl<'a> Parser<'a> {
 mod tests {
     use std::vec;
 
-    use crate::rewrite::{AltArgs, ConcatArgs, ParsingResult, StarArg};
-
     use super::Parser;
+    use super::{AltArgs, ConcatArgs, ParsingResult, StarArg};
 
     #[test]
     fn basic_const_test() {
