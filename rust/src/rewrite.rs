@@ -154,8 +154,8 @@ impl<'a> Parser<'a> {
     // UNARY ::= (CONCAT "*"+)* CONCAT
     fn expect_unary(&mut self) -> ParsingResult {
         let mut unary_args: Vec<ConcatArgs> = vec![];
-        let mut unary_body_accepts_empty: bool = false;
-        let mut unary_tail_accepts_empty: bool = false;
+        let mut unary_body_accepts_empty: bool = true;
+        let mut unary_tail_accepts_empty: bool = true;
         loop {
             if self.check('|') || self.check(')') || self.at_end() {
                 break;
@@ -576,39 +576,31 @@ mod tests {
                     parenthesized: true,
                 },
             ],
-            body_accepts_empty: false,
+            body_accepts_empty: true,
             tail_accepts_empty: false,
             parenthesized: false,
         };
         assert_eq!(expected, res);
     }
 
-    // #[test]
-    // fn star_concat() {
-    //     let expr = "(ab)*(ed)*";
-    //     let mut parser = Parser::default();
-    //
-    //     let res = parser.parse(expr);
-    //     let expected = OperationArg::Operation(Operation::Concat {
-    //         args: vec![
-    //             OperationArg::Operation(Operation::Star(Box::new(
-    //                 OperationArg::Const {
-    //                     expr: "ab".to_string(),
-    //                     parenthesized: true,
-    //                 },
-    //             ))),
-    //             OperationArg::Operation(Operation::Star(Box::new(
-    //                 OperationArg::Const {
-    //                     expr: "ed".to_string(),
-    //                     parenthesized: true,
-    //                 },
-    //             ))),
-    //         ],
-    //         accepts_empty: true,
-    //     });
-    //     assert_eq!(expected, res);
-    // }
-    //
+    #[test]
+    fn star_concat() {
+        let expr = "(ab)*(ed)*";
+        let mut parser = Parser::default();
+
+        let res = parser.parse(expr);
+        let expected = ParsingResult::Concat {
+            args: vec![
+                ConcatArgs::Star(Box::new(StarArg::Regex("ab".to_string()))),
+                ConcatArgs::Star(Box::new(StarArg::Regex("ed".to_string()))),
+            ],
+            body_accepts_empty: true,
+            tail_accepts_empty: true,
+            parenthesized: false,
+        };
+        assert_eq!(expected, res);
+    }
+
     // #[test]
     // fn double_star() {
     //     let expr = "(abc)**";
