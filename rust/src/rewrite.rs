@@ -151,26 +151,64 @@ impl<'a> Parser<'a> {
         }
     }
 
+    // UNARY ::= (CONCAT "*"+)* CONCAT
     fn expect_unary(&mut self) -> ParsingResult {
-        let mut subexpr = self.expect_concat();
-        if !self.check('*') {
-            if subexpr.is_none() {
-                self.report("expected non-empty concat");
-            }
-            return subexpr.unwrap();
-        }
-
         let mut unary_args: Vec<ConcatArgs> = vec![];
         let mut unary_body_accepts_empty: bool = false;
         let mut unary_tail_accepts_empty: bool = false;
-        let mut unary_parenthesized: bool = false;
-
-        while self.check('*') {
-            self.advance();
-            while self.check('*') {
-                self.advance();
+        loop {
+            if self.check('|') || self.check(')') || self.at_end() {
+                break;
             }
-            let res = match subexpr {
+
+            let subexpr = self.expect_concat();
+            if !self.check('*') {
+                match subexpr {
+                    ParsingResult::Alt { args, accepts_empty } => {
+                        unary_body_accepts_empty &= unary_tail_accepts_empty;
+                        unary_tail_accepts_empty = accepts_empty;
+                        unary_args
+                            .push(ConcatArgs::Alt { args, accepts_empty });
+                    }
+                    ParsingResult::Concat {
+                        args,
+                        body_accepts_empty,
+                        tail_accepts_empty,
+                        parenthesized: _,
+                    } => {
+                        unary_body_accepts_empty &= unary_tail_accepts_empty;
+                        unary_tail_accepts_empty =
+                            body_accepts_empty & tail_accepts_empty;
+                        unary_args.push(ConcatArgs::Concat {
+                            args,
+                            body_accepts_empty,
+                            tail_accepts_empty,
+                        })
+                    }
+                    ParsingResult::Star(arg) => {
+                        unary_body_accepts_empty &= unary_tail_accepts_empty;
+                        unary_tail_accepts_empty = true;
+                        unary_args.push(ConcatArgs::Star(arg))
+                    }
+                    ParsingResult::Regex { arg, parenthesized } => {
+                        unary_body_accepts_empty &= unary_tail_accepts_empty;
+                        unary_tail_accepts_empty = false;
+                        unary_args
+                            .push(ConcatArgs::Regex { arg, parenthesized });
+                    }
+                }
+                break;
+            }
+            loop {
+                self.advance();
+                if !self.check('*') {
+                    break;
+                }
+            }
+
+            unary_body_accepts_empty &= unary_tail_accepts_empty;
+            unary_tail_accepts_empty = true;
+            unary_args.push(match subexpr {
                 ParsingResult::Alt { args, accepts_empty } => {
                     ConcatArgs::Star(Box::new(StarArg::Alt {
                         args,
@@ -233,13 +271,11 @@ impl<'a> Parser<'a> {
                     }
                 }
                 ParsingResult::Star(arg) => ConcatArgs::Star(arg),
-                ParsingResult::Regex { arg, parenthesized } => {
+                ParsingResult::Regex { arg, parenthesized: _ } => {
                     ConcatArgs::Star(Box::new(StarArg::Regex(arg)))
                 }
-            };
-            subexpr = self.expect_concat();
+            });
         }
-
         if unary_args.len() >= 2 {
             ParsingResult::Concat {
                 args: unary_args,
@@ -257,7 +293,7 @@ impl<'a> Parser<'a> {
                     args,
                     body_accepts_empty,
                     tail_accepts_empty,
-                    parenthesized: true,
+                    parenthesized: false,
                 },
                 ConcatArgs::Alt { args, accepts_empty } => {
                     ParsingResult::Alt { args, accepts_empty }
@@ -272,7 +308,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn expect_concat(&mut self) -> Option<ParsingResult> {
+    fn expect_concat(&mut self) -> ParsingResult {
         let mut main_args: Vec<ConcatArgs> = vec![];
         let mut main_body_accepts_empty = true;
         let mut main_tail_accepts_empty = true;
@@ -356,34 +392,34 @@ impl<'a> Parser<'a> {
         }
 
         if main_args.len() >= 2 {
-            Some(ParsingResult::Concat {
+            ParsingResult::Concat {
                 args: main_args,
                 body_accepts_empty: main_body_accepts_empty,
                 tail_accepts_empty: main_tail_accepts_empty,
                 parenthesized: false,
-            })
+            }
         } else if main_args.len() == 1 {
             match main_args.pop().unwrap() {
                 ConcatArgs::Concat {
                     args,
                     body_accepts_empty,
                     tail_accepts_empty,
-                } => Some(ParsingResult::Concat {
+                } => ParsingResult::Concat {
                     args,
                     body_accepts_empty,
                     tail_accepts_empty,
-                    parenthesized: true,
-                }),
+                    parenthesized: false,
+                },
                 ConcatArgs::Alt { args, accepts_empty } => {
-                    Some(ParsingResult::Alt { args, accepts_empty })
+                    ParsingResult::Alt { args, accepts_empty }
                 }
-                ConcatArgs::Star(arg) => Some(ParsingResult::Star(arg)),
+                ConcatArgs::Star(arg) => ParsingResult::Star(arg),
                 ConcatArgs::Regex { arg, parenthesized } => {
-                    Some(ParsingResult::Regex { arg, parenthesized })
+                    ParsingResult::Regex { arg, parenthesized }
                 }
             }
         } else {
-            None
+            unreachable!();
         }
     }
 
@@ -441,6 +477,10 @@ impl<'a> Parser<'a> {
             }
         }
         false
+    }
+
+    fn at_end(&mut self) -> bool {
+        self.peek().is_none()
     }
 }
 
