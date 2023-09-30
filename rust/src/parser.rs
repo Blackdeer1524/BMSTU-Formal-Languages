@@ -8,6 +8,10 @@ pub enum AltArg {
         body_accepts_empty: bool,
         tail_accepts_empty: bool,
     },
+    Alt {
+        args: Vec<AltArg>,
+        accepts_empty: bool,
+    },
     Star(Box<StarArg>),
     Regex {
         arg: String,
@@ -145,6 +149,9 @@ impl<'a> Parser<'a> {
                 AltArg::Regex { arg, parenthesized } => {
                     ParsingResult::Regex { arg, parenthesized }
                 }
+                AltArg::Alt { args, accepts_empty } => unreachable!(
+                    "в логике кода альтернативы альтернатив \"сплющиваются\""
+                ),
             }
         } else {
             unreachable!();
