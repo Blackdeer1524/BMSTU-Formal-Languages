@@ -797,12 +797,37 @@ mod tests {
         assert_eq!(expected, res);
     }
 
-    // #[test]
-    // fn star_simplification() {
-    //     let expr = "((abc)*|(bcd)*)**a***(((abc)*)**)***";
-    //     let mut parser = Parser::default();
-    //
-    //     let res = parser.parse(expr);
-    //     assert_eq!(expected, res);
-    // }
+    #[test]
+    fn star_simplification() {
+        let expr = "((abc)*|(bcd)*)**a***(((abc)*)**)***";
+        let mut parser = Parser::default();
+
+        let mut res = parser.parse(expr);
+        apply_ssnf(&mut res);
+
+        let expected = ParsingResult::Concat {
+            args: vec![
+                ConcatArg::Star(Box::new(StarArg::Alt {
+                    args: vec![
+                        AltArg::Regex {
+                            arg: "abc".to_string(),
+                            parenthesized: true,
+                        },
+                        AltArg::Regex {
+                            arg: "bcd".to_string(),
+                            parenthesized: true,
+                        },
+                    ],
+                    accepts_empty: false,
+                })),
+                ConcatArg::Star(Box::new(StarArg::Regex("a".to_string()))),
+                ConcatArg::Star(Box::new(StarArg::Regex("abc".to_string()))),
+            ],
+            body_accepts_empty: true,
+            tail_accepts_empty: true,
+            parenthesized: false,
+        };
+
+        assert_eq!(expected, res);
+    }
 }
