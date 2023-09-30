@@ -511,75 +511,7 @@ pub fn apply_ssnf(root: &mut ParsingResult) {
             tail_accepts_empty,
             parenthesized,
         } => {
-            if *body_accepts_empty && *tail_accepts_empty {
-                let mut new_accepts_empty = true;
-                let new_args: Vec<AltArg> = args
-                    .iter_mut()
-                    .map(|item| {
-                        ss_concat(item);
-                        match item {
-                            ConcatArg::Concat {
-                                args,
-                                body_accepts_empty,
-                                tail_accepts_empty,
-                            } => {
-                                new_accepts_empty &=
-                                    *body_accepts_empty && *tail_accepts_empty;
-                                AltArg::Concat {
-                                    args: args.clone(),
-                                    body_accepts_empty: *body_accepts_empty,
-                                    tail_accepts_empty: *tail_accepts_empty,
-                                }
-                            }
-                            ConcatArg::Alt { args, accepts_empty } => {
-                                new_accepts_empty &= *accepts_empty;
-                                AltArg::Alt {
-                                    args: args.clone(),
-                                    accepts_empty: *accepts_empty,
-                                }
-                            }
-                            ConcatArg::Star(arg) => AltArg::Star(arg.clone()),
-                            ConcatArg::Regex { arg, parenthesized } => {
-                                new_accepts_empty = false;
-                                AltArg::Regex {
-                                    arg: arg.clone(),
-                                    parenthesized: *parenthesized,
-                                }
-                            }
-                        }
-                    })
-                    .collect();
-                *root = ParsingResult::Alt {
-                    args: new_args,
-                    accepts_empty: new_accepts_empty,
-                }
-            } else {
-                let mut new_tail_accepts_empty = true;
-                let mut new_body_accepts_empty = true;
-                args.iter_mut().for_each(|item| {
-                    ssnf_concat(item);
-                    new_body_accepts_empty &= new_tail_accepts_empty;
-                    match item {
-                        ConcatArg::Concat {
-                            args,
-                            body_accepts_empty,
-                            tail_accepts_empty,
-                        } => {
-                            new_tail_accepts_empty =
-                                *body_accepts_empty && *tail_accepts_empty;
-                        }
-                        ConcatArg::Alt { args, accepts_empty } => {
-                            new_tail_accepts_empty = *accepts_empty;
-                        }
-                        ConcatArg::Star(_) => {
-                            new_tail_accepts_empty = true;
-                        }
-                        ConcatArg::Regex { arg, parenthesized } => {
-                            new_tail_accepts_empty = false;
-                        }
-                    }
-                });
-            }
+            args.iter_mut().for_each(ssnf_concat);
         }
         ParsingResult::Star(star_arg) => {
             ss_star(star_arg);

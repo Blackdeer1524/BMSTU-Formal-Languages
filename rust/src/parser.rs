@@ -536,6 +536,7 @@ impl<'a> Parser<'a> {
 mod tests {
     use std::vec;
 
+    use super::super::ssnf::apply_ssnf;
     use super::Parser;
     use super::{AltArg, ConcatArg, ParsingResult, StarArg};
 
@@ -544,7 +545,8 @@ mod tests {
         let expr = "test_regex";
         let mut parser = Parser::default();
 
-        let res = parser.parse(expr);
+        let mut res = parser.parse(expr);
+        apply_ssnf(&mut res);
         let expected = ParsingResult::Regex {
             arg: "test_regex".to_string(),
             parenthesized: false,
@@ -557,7 +559,8 @@ mod tests {
         let expr = "abc|cde";
         let mut parser = Parser::default();
 
-        let res = parser.parse(expr);
+        let mut res = parser.parse(expr);
+        apply_ssnf(&mut res);
 
         let expected = ParsingResult::Alt {
             args: vec![
@@ -574,7 +577,8 @@ mod tests {
         let expr = "abc(cde)efg";
         let mut parser = Parser::default();
 
-        let res = parser.parse(expr);
+        let mut res = parser.parse(expr);
+        apply_ssnf(&mut res);
         let expected = ParsingResult::Concat {
             args: vec![
                 ConcatArg::Regex {
@@ -602,7 +606,8 @@ mod tests {
         let expr = "(abc)*";
         let mut parser = Parser::default();
 
-        let res = parser.parse(expr);
+        let mut res = parser.parse(expr);
+        apply_ssnf(&mut res);
         let expected =
             ParsingResult::Star(Box::new(StarArg::Regex("abc".to_string())));
 
@@ -614,7 +619,8 @@ mod tests {
         let expr = "(abc)*(cde)";
         let mut parser = Parser::default();
 
-        let res = parser.parse(expr);
+        let mut res = parser.parse(expr);
+        apply_ssnf(&mut res);
         let expected = ParsingResult::Concat {
             args: vec![
                 ConcatArg::Star(Box::new(StarArg::Regex("abc".to_string()))),
@@ -635,7 +641,8 @@ mod tests {
         let expr = "(ab)*(ed)*";
         let mut parser = Parser::default();
 
-        let res = parser.parse(expr);
+        let mut res = parser.parse(expr);
+        apply_ssnf(&mut res);
         let expected = ParsingResult::Concat {
             args: vec![
                 ConcatArg::Star(Box::new(StarArg::Regex("ab".to_string()))),
@@ -652,7 +659,8 @@ mod tests {
     fn double_star() {
         let expr = "(abc)**";
         let mut parser = Parser::default();
-        let res = parser.parse(expr);
+        let mut res = parser.parse(expr);
+        apply_ssnf(&mut res);
 
         let expected =
             ParsingResult::Star(Box::new(StarArg::Regex("abc".to_string())));
@@ -664,7 +672,8 @@ mod tests {
     fn non_greedy_star() {
         let expr = "(cd)qa*";
         let mut parser = Parser::default();
-        let res = parser.parse(expr);
+        let mut res = parser.parse(expr);
+        apply_ssnf(&mut res);
 
         let expected = ParsingResult::Concat {
             args: vec![
@@ -684,7 +693,8 @@ mod tests {
     fn concat_double_star() {
         let expr = "(abc)*(cde)**";
         let mut parser = Parser::default();
-        let res = parser.parse(expr);
+        let mut res = parser.parse(expr);
+        apply_ssnf(&mut res);
 
         let expected = ParsingResult::Concat {
             args: vec![
@@ -703,7 +713,8 @@ mod tests {
     fn trailing_concat_in_unary() {
         let expr = "a*abc(q)r";
         let mut parser = Parser::default();
-        let res = parser.parse(expr);
+        let mut res = parser.parse(expr);
+        apply_ssnf(&mut res);
 
         let expected = ParsingResult::Concat {
             args: vec![
@@ -727,7 +738,8 @@ mod tests {
         let expr = "(abc)*((cde)|(edf))**|(qrp)";
         let mut parser = Parser::default();
 
-        let res = parser.parse(expr);
+        let mut res = parser.parse(expr);
+        apply_ssnf(&mut res);
         let expected = ParsingResult::Alt {
             args: vec![
                 AltArg::Concat {
