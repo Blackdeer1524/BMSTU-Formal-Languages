@@ -19,6 +19,36 @@ pub enum AltArg {
     },
 }
 
+impl ToString for AltArg {
+    fn to_string(&self) -> String {
+        match self {
+            AltArg::Concat { args, body_accepts_empty, tail_accepts_empty } => {
+                args.iter()
+                    .map(|item| item.to_string())
+                    .collect::<Vec<String>>()
+                    .join("")
+            }
+            AltArg::Alt { args, accepts_empty } => {
+                format!(
+                    "({})",
+                    args.iter()
+                        .map(|item| item.to_string())
+                        .collect::<Vec<String>>()
+                        .join("|")
+                )
+            }
+            AltArg::Star(arg) => format!("({})*", arg.to_string()),
+            AltArg::Regex { arg, parenthesized } => {
+                if *parenthesized {
+                    format!("({arg})")
+                } else {
+                    arg.to_string()
+                }
+            }
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum ConcatArg {
     Concat {
@@ -38,6 +68,41 @@ pub enum ConcatArg {
     },
 }
 
+impl ToString for ConcatArg {
+    fn to_string(&self) -> String {
+        match self {
+            ConcatArg::Concat {
+                args,
+                body_accepts_empty,
+                tail_accepts_empty,
+            } => format!(
+                "({})",
+                args.iter()
+                    .map(|item| item.to_string())
+                    .collect::<Vec<String>>()
+                    .join("")
+            ),
+            ConcatArg::Alt { args, accepts_empty } => {
+                format!(
+                    "({})",
+                    args.iter()
+                        .map(|item| { item.to_string() })
+                        .collect::<Vec<String>>()
+                        .join("|")
+                )
+            }
+            ConcatArg::Star(arg) => format!("({})*", arg.to_string()),
+            ConcatArg::Regex { arg, parenthesized } => {
+                if *parenthesized {
+                    format!("({arg})")
+                } else {
+                    arg.to_string()
+                }
+            }
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum StarArg {
     Alt {
@@ -51,6 +116,28 @@ pub enum StarArg {
         tail_accepts_empty: bool,
     },
     Regex(String),
+}
+
+impl ToString for StarArg {
+    fn to_string(&self) -> String {
+        match self {
+            StarArg::Concat {
+                args,
+                body_accepts_empty,
+                tail_accepts_empty,
+            } => args
+                .iter()
+                .map(|item| item.to_string())
+                .collect::<Vec<String>>()
+                .join(""),
+            StarArg::Alt { args, accepts_empty } => args
+                .iter()
+                .map(|item| item.to_string())
+                .collect::<Vec<String>>()
+                .join("|"),
+            StarArg::Regex(arg) => arg.to_string(),
+        }
+    }
 }
 
 #[derive(Default)]
@@ -740,6 +827,7 @@ mod tests {
 
         assert_eq!(expected, res);
     }
+
     #[test]
     fn the_test() {
         let expr = "(abc)*((cde)|(edf))**|(qrp)";
@@ -799,7 +887,7 @@ mod tests {
 
     #[test]
     fn star_simplification() {
-        let expr = "((abc)*|(bcd)*)**a***(((abc)*)**)***";
+        let expr = "((abc)*(bcd)*)**a***(((abc)*)**)***";
         let mut parser = Parser::default();
 
         let mut res = parser.parse(expr);
