@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 use super::parser::{AltArg, ConcatArg, ParsingResult, StarArg};
 
 fn ssnf_alt(arg: &mut AltArg) {
@@ -54,6 +56,9 @@ fn ssnf_alt(arg: &mut AltArg) {
                     }
                 }
             });
+            args.sort_unstable_by(|left, right| {
+                left.to_string().cmp(&right.to_string())
+            })
         }
         AltArg::Star(star_arg) => {
             ss_star(star_arg);
@@ -116,6 +121,9 @@ fn ssnf_concat(arg: &mut ConcatArg) {
                     }
                 }
             });
+            args.sort_unstable_by(|left, right| {
+                left.to_string().cmp(&right.to_string())
+            })
         }
         ConcatArg::Star(star_arg) => {
             ss_star(star_arg);
@@ -151,6 +159,9 @@ fn ss_star(arg: &mut StarArg) {
                     }
                 }
             });
+            args.sort_unstable_by(|left, right| {
+                left.to_string().cmp(&right.to_string())
+            })
         }
         StarArg::Concat { args, body_accepts_empty, tail_accepts_empty } => {
             if *body_accepts_empty && *tail_accepts_empty {
@@ -191,6 +202,11 @@ fn ss_star(arg: &mut StarArg) {
                         }
                     })
                     .collect();
+                args.sort_unstable_by(|left, right| {
+                    let left_str = left.to_string();
+                    let right_str = right.to_string();
+                    left_str.cmp(&right_str)
+                });
                 *arg = StarArg::Alt {
                     args: new_args,
                     accepts_empty: new_accepts_empty,
@@ -268,6 +284,9 @@ fn ss_alt(arg: &mut AltArg) {
                         }
                     })
                     .collect();
+                args.sort_unstable_by(|left, right| {
+                    left.to_string().cmp(&right.to_string())
+                });
                 *arg = AltArg::Alt {
                     args: new_args,
                     accepts_empty: new_accepts_empty,
@@ -325,6 +344,9 @@ fn ss_alt(arg: &mut AltArg) {
                     }
                 }
             });
+            args.sort_unstable_by(|left, right| {
+                left.to_string().cmp(&right.to_string())
+            })
         }
         AltArg::Star(star_arg) => {
             ss_star(star_arg);
@@ -393,6 +415,9 @@ fn ss_concat(arg: &mut ConcatArg) {
                         }
                     })
                     .collect();
+                args.sort_unstable_by(|left, right| {
+                    left.to_string().cmp(&right.to_string())
+                });
                 *arg = ConcatArg::Alt {
                     args: new_args,
                     accepts_empty: new_accepts_empty,
@@ -450,6 +475,9 @@ fn ss_concat(arg: &mut ConcatArg) {
                     }
                 }
             });
+            args.sort_unstable_by(|left, right| {
+                left.to_string().cmp(&right.to_string())
+            })
         }
         ConcatArg::Star(star_arg) => {
             ss_star(star_arg);
@@ -504,6 +532,9 @@ pub fn apply_ssnf(root: &mut ParsingResult) {
                     }
                 }
             });
+            args.sort_unstable_by(|left, right| {
+                left.to_string().cmp(&right.to_string())
+            })
         }
         ParsingResult::Concat {
             args,
