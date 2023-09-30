@@ -158,11 +158,13 @@ impl<'a> Parser<'a> {
         }
     }
 
-    // UNARY ::= (CONCAT "*"+)* CONCAT
+    // UNARY ::= (CONCAT "*"+)* CONCAT "*"*
     fn expect_unary(&mut self) -> ParsingResult {
         let mut unary_args: Vec<ConcatArg> = vec![];
         let mut unary_body_accepts_empty: bool = true;
         let mut unary_tail_accepts_empty: bool = true;
+
+        let mut last_concat_parens = false;
         loop {
             if self.check('|') || self.check(')') || self.at_end() {
                 break;
@@ -182,6 +184,7 @@ impl<'a> Parser<'a> {
                         tail_accepts_empty,
                         parenthesized,
                     } => {
+                        last_concat_parens = parenthesized;
                         if parenthesized {
                             unary_body_accepts_empty &=
                                 unary_tail_accepts_empty;
@@ -234,19 +237,23 @@ impl<'a> Parser<'a> {
                     body_accepts_empty,
                     tail_accepts_empty,
                     parenthesized: true,
-                } => unary_args.push(ConcatArg::Star(Box::new(
-                    StarArg::Concat {
-                        args,
-                        body_accepts_empty,
-                        tail_accepts_empty,
-                    },
-                ))),
+                } => {
+                    last_concat_parens = true;
+                    unary_args.push(ConcatArg::Star(Box::new(
+                        StarArg::Concat {
+                            args,
+                            body_accepts_empty,
+                            tail_accepts_empty,
+                        },
+                    )))
+                }
                 ParsingResult::Concat {
                     mut args,
                     mut body_accepts_empty,
                     mut tail_accepts_empty,
                     parenthesized: false,
                 } => {
+                    last_concat_parens = false;
                     let last = args
                         .pop()
                         .expect("Concat always have at least 2 items");
@@ -341,7 +348,7 @@ impl<'a> Parser<'a> {
                     args,
                     body_accepts_empty,
                     tail_accepts_empty,
-                    parenthesized: false,
+                    parenthesized: last_concat_parens,
                 },
                 ConcatArg::Alt { args, accepts_empty } => {
                     ParsingResult::Alt { args, accepts_empty }
@@ -456,7 +463,7 @@ impl<'a> Parser<'a> {
                     args,
                     body_accepts_empty,
                     tail_accepts_empty,
-                    parenthesized: false,
+                    parenthesized: true,
                 },
                 ConcatArg::Alt { args, accepts_empty } => {
                     ParsingResult::Alt { args, accepts_empty }
@@ -772,44 +779,30 @@ mod tests {
         assert_eq!(expected, res);
     }
 
+    #[test]
+    fn ssnf_on_concat() {
+        let expr = "((abc)*(cde)*)*";
+        let mut parser = Parser::default();
+
+        let mut res = parser.parse(expr);
+        apply_ssnf(&mut res);
+
+        let expected = ParsingResult::Star(Box::new(StarArg::Alt {
+            args: vec![
+                AltArg::Regex { arg: "abc".to_string(), parenthesized: true },
+                AltArg::Regex { arg: "cde".to_string(), parenthesized: true },
+            ],
+            accepts_empty: false,
+        }));
+        assert_eq!(expected, res);
+    }
+
     // #[test]
     // fn star_simplification() {
     //     let expr = "((abc)*|(bcd)*)**a***(((abc)*)**)***";
     //     let mut parser = Parser::default();
     //
     //     let res = parser.parse(expr);
-    //     let expected = OperationArg::Operation(Operation::Concat {
-    //         args: vec![
-    //             OperationArg::Operation(Operation::Star(Box::new(
-    //                 OperationArg::Operation(Operation::Alternative {
-    //                     args: vec![
-    //                         OperationArg::Const {
-    //                             expr: "abc".to_string(),
-    //                             parenthesized: true,
-    //                         },
-    //                         OperationArg::Const {
-    //                             expr: "bcd".to_string(),
-    //                             parenthesized: true,
-    //                         },
-    //                     ],
-    //                     accepts_empty: true,
-    //                 }),
-    //             ))),
-    //             OperationArg::Operation(Operation::Star(Box::new(
-    //                 OperationArg::Const {
-    //                     expr: "a".to_string(),
-    //                     parenthesized: false,
-    //                 },
-    //             ))),
-    //             OperationArg::Operation(Operation::Star(Box::new(
-    //                 OperationArg::Const {
-    //                     expr: "abc".to_string(),
-    //                     parenthesized: true,
-    //                 },
-    //             ))),
-    //         ],
-    //         accepts_empty: true,
-    //     });
     //     assert_eq!(expected, res);
     // }
 }
