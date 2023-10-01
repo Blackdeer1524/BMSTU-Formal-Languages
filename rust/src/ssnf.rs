@@ -203,9 +203,7 @@ fn ss_star(arg: &mut StarArg) {
                     })
                     .collect();
                 args.sort_unstable_by(|left, right| {
-                    let left_str = left.to_string();
-                    let right_str = right.to_string();
-                    left_str.cmp(&right_str)
+                    left.to_string().cmp(&right.to_string())
                 });
                 *arg = StarArg::Alt {
                     args: new_args,
