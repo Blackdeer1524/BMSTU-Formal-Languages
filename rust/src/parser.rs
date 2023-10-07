@@ -1037,6 +1037,6 @@ mod tests {
             parenthesized: false,
         };
 
-        // assert_eq!(expected, res);
+        assert_eq!(expected, res);
     }
 }
