@@ -1,5 +1,3 @@
-use std::fmt::Debug;
-
 use super::parser::{AltArg, ConcatArg, ParsingResult, StarArg};
 
 fn ssnf_alt(arg: &mut AltArg) {
