@@ -9,10 +9,6 @@ pub enum AltArg {
         body_accepts_empty: bool,
         tail_accepts_empty: bool,
     },
-    Alt {
-        args: Vec<AltArg>,
-        accepts_empty: bool,
-    },
     Star(Box<StarArg>),
     Regex {
         arg: String,
@@ -97,9 +93,6 @@ impl From<AltArg> for ParsingResult {
                     parenthesized: true,
                 }
             }
-            AltArg::Alt { args, accepts_empty } => {
-                ParsingResult::Alt { args, accepts_empty }
-            }
             AltArg::Star(arg) => ParsingResult::Star(arg),
             AltArg::Regex { arg, parenthesized } => {
                 ParsingResult::Regex { arg, parenthesized }
@@ -116,15 +109,6 @@ impl ToString for AltArg {
                     .map(|item| item.to_string())
                     .collect::<Vec<String>>()
                     .join("")
-            }
-            AltArg::Alt { args, accepts_empty } => {
-                format!(
-                    "({})",
-                    args.iter()
-                        .map(|item| item.to_string())
-                        .collect::<Vec<String>>()
-                        .join("|")
-                )
             }
             AltArg::Star(arg) => format!("({})*", arg.to_string()),
             AltArg::Regex { arg, parenthesized } => {
@@ -373,9 +357,6 @@ impl<'a> Parser<'a> {
                 AltArg::Regex { arg, parenthesized } => {
                     ParsingResult::Regex { arg, parenthesized }
                 }
-                AltArg::Alt { args, accepts_empty } => unreachable!(
-                    "в логике кода альтернативы альтернатив \"сплющиваются\""
-                ),
             }
         } else {
             unreachable!();
