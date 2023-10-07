@@ -1,4 +1,4 @@
-use super::ssnf::apply_ssnf;
+use super::ssnf::ssnf;
 use std::{str::Chars, usize, vec};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -18,6 +18,94 @@ pub enum AltArg {
         arg: String,
         parenthesized: bool,
     },
+}
+
+impl From<ParsingResult> for AltArg {
+    fn from(value: ParsingResult) -> Self {
+        match value {
+            ParsingResult::Alt { args, accepts_empty } => {
+                unreachable!();
+            }
+            ParsingResult::Concat {
+                args,
+                body_accepts_empty,
+                tail_accepts_empty,
+                parenthesized,
+            } => {
+                AltArg::Concat { args, body_accepts_empty, tail_accepts_empty }
+            }
+            ParsingResult::Star(arg) => AltArg::Star(arg),
+            ParsingResult::Regex { arg, parenthesized } => {
+                AltArg::Regex { arg, parenthesized }
+            }
+        }
+    }
+}
+
+impl From<ParsingResult> for ConcatArg {
+    fn from(value: ParsingResult) -> Self {
+        match value {
+            ParsingResult::Alt { args, accepts_empty } => {
+                ConcatArg::Alt { args, accepts_empty }
+            }
+            ParsingResult::Concat {
+                args,
+                body_accepts_empty,
+                tail_accepts_empty,
+                parenthesized,
+            } => ConcatArg::Concat {
+                args,
+                body_accepts_empty,
+                tail_accepts_empty,
+            },
+            ParsingResult::Star(arg) => ConcatArg::Star(arg),
+            ParsingResult::Regex { arg, parenthesized } => {
+                ConcatArg::Regex { arg, parenthesized }
+            }
+        }
+    }
+}
+
+impl From<ParsingResult> for StarArg {
+    fn from(value: ParsingResult) -> Self {
+        match value {
+            ParsingResult::Alt { args, accepts_empty } => {
+                StarArg::Alt { args, accepts_empty }
+            }
+            ParsingResult::Concat {
+                args,
+                body_accepts_empty,
+                tail_accepts_empty,
+                parenthesized,
+            } => {
+                StarArg::Concat { args, body_accepts_empty, tail_accepts_empty }
+            }
+            ParsingResult::Star(arg) => unreachable!(),
+            ParsingResult::Regex { arg, parenthesized } => StarArg::Regex(arg),
+        }
+    }
+}
+
+impl From<AltArg> for ParsingResult {
+    fn from(value: AltArg) -> Self {
+        match value {
+            AltArg::Concat { args, body_accepts_empty, tail_accepts_empty } => {
+                ParsingResult::Concat {
+                    args,
+                    body_accepts_empty,
+                    tail_accepts_empty,
+                    parenthesized: true,
+                }
+            }
+            AltArg::Alt { args, accepts_empty } => {
+                ParsingResult::Alt { args, accepts_empty }
+            }
+            AltArg::Star(arg) => ParsingResult::Star(arg),
+            AltArg::Regex { arg, parenthesized } => {
+                ParsingResult::Regex { arg, parenthesized }
+            }
+        }
+    }
 }
 
 impl ToString for AltArg {
@@ -69,6 +157,30 @@ pub enum ConcatArg {
     },
 }
 
+impl From<ConcatArg> for ParsingResult {
+    fn from(value: ConcatArg) -> Self {
+        match value {
+            ConcatArg::Concat {
+                args,
+                body_accepts_empty,
+                tail_accepts_empty,
+            } => ParsingResult::Concat {
+                args,
+                body_accepts_empty,
+                tail_accepts_empty,
+                parenthesized: true,
+            },
+            ConcatArg::Alt { args, accepts_empty } => {
+                ParsingResult::Alt { args, accepts_empty }
+            }
+            ConcatArg::Star(arg) => ParsingResult::Star(arg),
+            ConcatArg::Regex { arg, parenthesized } => {
+                ParsingResult::Regex { arg, parenthesized }
+            }
+        }
+    }
+}
+
 impl ToString for ConcatArg {
     fn to_string(&self) -> String {
         match self {
@@ -117,6 +229,29 @@ pub enum StarArg {
         tail_accepts_empty: bool,
     },
     Regex(String),
+}
+
+impl From<StarArg> for ParsingResult {
+    fn from(value: StarArg) -> Self {
+        match value {
+            StarArg::Alt { args, accepts_empty } => {
+                ParsingResult::Alt { args, accepts_empty }
+            }
+            StarArg::Concat {
+                args,
+                body_accepts_empty,
+                tail_accepts_empty,
+            } => ParsingResult::Concat {
+                args,
+                body_accepts_empty,
+                tail_accepts_empty,
+                parenthesized: true,
+            },
+            StarArg::Regex(arg) => {
+                ParsingResult::Regex { arg, parenthesized: true }
+            }
+        }
+    }
 }
 
 impl ToString for StarArg {
@@ -173,8 +308,7 @@ impl<'a> Parser<'a> {
         self.expr_iter = Some(regex.chars());
         self.next_char = None;
         let mut res = self.expect_alternative();
-        apply_ssnf(&mut res);
-        res
+        ssnf(res)
     }
 
     fn expect_alternative(&mut self) -> ParsingResult {
@@ -633,7 +767,6 @@ impl<'a> Parser<'a> {
 mod tests {
     use std::vec;
 
-    use super::super::ssnf::apply_ssnf;
     use super::Parser;
     use super::{AltArg, ConcatArg, ParsingResult, StarArg};
 
