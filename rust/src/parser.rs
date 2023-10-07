@@ -991,6 +991,24 @@ mod tests {
     }
 
     #[test]
+    fn nested_alternative() {
+        let expr = "(a|(b|(c|d)))";
+        let mut parser = Parser::default();
+
+        let res = parser.parse(expr);
+        let expected = ParsingResult::Alt {
+            args: vec![
+                AltArg::Regex { arg: "a".to_string(), parenthesized: false },
+                AltArg::Regex { arg: "b".to_string(), parenthesized: false },
+                AltArg::Regex { arg: "c".to_string(), parenthesized: false },
+                AltArg::Regex { arg: "d".to_string(), parenthesized: false },
+            ],
+            accepts_empty: false,
+        };
+        assert_eq!(expected, res);
+    }
+
+    #[test]
     fn star_simplification() {
         let expr = "((bcd)*(abc)*)**a***(((abc)*)**)***";
         let mut parser = Parser::default();
