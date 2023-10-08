@@ -339,23 +339,37 @@ mod tests {
         assert_eq!(expected, res);
     }
 
-    // #[test]
-    // fn basic_alternative_test() {
-    //     let expr = "abc|cde";
-    //     let mut parser = Parser::default();
-    //
-    //     let res = parser.parse(expr);
-    //
-    //     let expected = ParsingResult::Alt {
-    //         args: vec![
-    //             AltArg::Regex { arg: "abc".to_string(), parenthesized: false },
-    //             AltArg::Regex { arg: "cde".to_string(), parenthesized: false },
-    //         ],
-    //         accepts_empty: false,
-    //     };
-    //     assert_eq!(expected, res);
-    // }
-    //
+    #[test]
+    fn basic_alternative_test() {
+        let expr = "abc|cde";
+        let mut parser = Parser::default();
+
+        let res = parser.parse(expr);
+
+        let expected = ParsingResult::Alt {
+            args: vec![
+                AltArg::Concat {
+                    args: vec![
+                        ConcatArg::Char('a'),
+                        ConcatArg::Char('b'),
+                        ConcatArg::Char('c'),
+                    ],
+                    accepts_empty: false,
+                },
+                AltArg::Concat {
+                    args: vec![
+                        ConcatArg::Char('c'),
+                        ConcatArg::Char('d'),
+                        ConcatArg::Char('e'),
+                    ],
+                    accepts_empty: false,
+                },
+            ],
+            accepts_empty: false,
+        };
+        assert_eq!(expected, res);
+    }
+
     // #[test]
     // fn basic_concat_test() {
     //     let expr = "abc(cde)efg";
