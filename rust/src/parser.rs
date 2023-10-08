@@ -101,6 +101,7 @@ impl<'a> Parser<'a> {
                     alt_args.extend(args);
                 }
                 ParsingResult::Concat { args, accepts_empty } => {
+                    alt_accepts_empty &= accepts_empty;
                     alt_args.push(AltArg::Concat { args, accepts_empty });
                 }
                 ParsingResult::Star(arg) => {
@@ -110,6 +111,7 @@ impl<'a> Parser<'a> {
             if !self.check('|') {
                 break;
             }
+            self.advance();
         }
         if alt_args.len() == 1 {
             let last = alt_args.pop().unwrap();
@@ -136,9 +138,9 @@ impl<'a> Parser<'a> {
                         unary_concat_args
                             .push(ConcatArg::Alt { args, accepts_empty });
                     }
-                    ParsingResult::Concat { mut args, accepts_empty } => {
+                    ParsingResult::Concat { args, accepts_empty } => {
                         unary_concat_accepts_empty &= accepts_empty;
-                        unary_concat_args.append(&mut args);
+                        unary_concat_args.extend(args);
                     }
                     ParsingResult::Star(arg) => {
                         unary_concat_args.push(ConcatArg::Star(arg));
@@ -370,34 +372,26 @@ mod tests {
         assert_eq!(expected, res);
     }
 
-    // #[test]
-    // fn basic_concat_test() {
-    //     let expr = "abc(cde)efg";
-    //     let mut parser = Parser::default();
-    //
-    //     let res = parser.parse(expr);
-    //     let expected = ParsingResult::Concat {
-    //         args: vec![
-    //             ConcatArg::Regex {
-    //                 arg: "abc".to_string(),
-    //                 parenthesized: false,
-    //             },
-    //             ConcatArg::Regex {
-    //                 arg: "cde".to_string(),
-    //                 parenthesized: true,
-    //             },
-    //             ConcatArg::Regex {
-    //                 arg: "efg".to_string(),
-    //                 parenthesized: false,
-    //             },
-    //         ],
-    //         body_accepts_empty: false,
-    //         tail_accepts_empty: false,
-    //         parenthesized: false,
-    //     };
-    //     assert_eq!(expected, res);
-    // }
-    //
+    #[test]
+    fn basic_concat_test() {
+        let expr = "ab(cd)ef";
+        let mut parser = Parser::default();
+
+        let res = parser.parse(expr);
+        let expected = ParsingResult::Concat {
+            args: vec![
+                ConcatArg::Char('a'),
+                ConcatArg::Char('b'),
+                ConcatArg::Char('c'),
+                ConcatArg::Char('d'),
+                ConcatArg::Char('e'),
+                ConcatArg::Char('f'),
+            ],
+            accepts_empty: false
+        };
+        assert_eq!(expected, res);
+    }
+
     // #[test]
     // fn basic_star_test() {
     //     let expr = "(abc)*";
