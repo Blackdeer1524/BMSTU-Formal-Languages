@@ -55,19 +55,6 @@ fn ss(arg: ParsingResult) -> ParsingResult {
                     }
                     ParsingResult::Star(arg) => {
                         unreachable!();
-                        // match *arg {
-                        //     StarArg::Alt { args, accepts_empty } => {
-                        //         new_accepts_empty &= accepts_empty;
-                        //         new_args.extend(args);
-                        //     }
-                        //     StarArg::Concat { args, accepts_empty } => {
-                        //         new_accepts_empty &= accepts_empty;
-                        //         new_args.push(AltArg::Concat {
-                        //             args,
-                        //             accepts_empty,
-                        //         })
-                        //     }
-                        // }
                     }
                 }
             });
@@ -94,19 +81,6 @@ fn ss(arg: ParsingResult) -> ParsingResult {
                         }
                         ParsingResult::Star(arg) => {
                             unreachable!();
-                            // match *arg {
-                            //     StarArg::Alt { args, accepts_empty } => {
-                            //         alt_accepts_empty &= accepts_empty;
-                            //         alt_args.extend(args);
-                            //     }
-                            //     StarArg::Concat { args, accepts_empty } => {
-                            //         alt_accepts_empty &= accepts_empty;
-                            //         alt_args.push(AltArg::Concat {
-                            //             args,
-                            //             accepts_empty,
-                            //         })
-                            //     }
-                            // }
                         }
                     }
                 });
@@ -135,45 +109,6 @@ fn ss(arg: ParsingResult) -> ParsingResult {
                 }
             }
         }
-        ParsingResult::Star(arg) => {
-            ss(ParsingResult::from(*arg))
-            // match *arg {
-            //     StarArg::Alt { args, accepts_empty } => {
-            //         let mut new_alt_args: Vec<AltArg> = vec![];
-            //         let mut new_accepts_emtpy = true;
-            //         args.into_iter().for_each(|item| {
-            //             let res = ss(ParsingResult::from(item));
-            //             match res {
-            //                 ParsingResult::Alt { args, accepts_empty } => {
-            //                     new_accepts_emtpy &= accepts_empty;
-            //                     new_alt_args.extend(args);
-            //                 }
-            //                 ParsingResult::Concat { args, accepts_empty } => {
-            //                     new_accepts_emtpy &= accepts_empty;
-            //                     new_alt_args.push(AltArg::Concat {
-            //                         args,
-            //                         accepts_empty,
-            //                     })
-            //                 }
-            //                 ParsingResult::Star(arg) => match *arg {
-            //                     StarArg::Alt { args, accepts_empty } => {
-            //                         new_accepts_emtpy &= accepts_empty;
-            //                         new_alt_args.extend(args);
-            //                     }
-            //                     StarArg::Concat { args, accepts_empty } => {
-            //                         new_accepts_emtpy &= accepts_empty;
-            //                         new_alt_args.push(AltArg::Concat {
-            //                             args,
-            //                             accepts_empty,
-            //                         })
-            //                     }
-            //                 },
-            //             }
-            //         });
-            //         ParsingResult::
-            //     }
-            //     StarArg::Concat { args, accepts_empty } => todo!(),
-            // }
-        }
+        ParsingResult::Star(arg) => ss(ParsingResult::from(*arg)),
     }
 }
