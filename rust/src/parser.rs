@@ -1,4 +1,4 @@
-use std::{str::Chars, usize, vec};
+use std::{collections::LinkedList, str::Chars, usize, vec};
 
 use crate::ssnf::ssnf;
 
@@ -78,7 +78,7 @@ pub struct Parser<'a> {
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum ParsingResult {
-    Alt { args: Vec<AltArg>, accepts_empty: bool },
+    Alt { args: LinkedList<AltArg>, accepts_empty: bool },
     Concat { args: Vec<ConcatArg>, accepts_empty: bool },
     Star(Box<StarArg>),
 }
@@ -97,9 +97,10 @@ impl From<AltArg> for ParsingResult {
 impl From<ConcatArg> for ParsingResult {
     fn from(value: ConcatArg) -> Self {
         match value {
-            ConcatArg::Alt { args, accepts_empty } => {
-                ParsingResult::Alt { args, accepts_empty }
-            }
+            ConcatArg::Alt { args, accepts_empty } => ParsingResult::Alt {
+                args: LinkedList::from_iter(args),
+                accepts_empty,
+            },
             ConcatArg::Star(arg) => ParsingResult::Star(arg),
             ConcatArg::Char(c) => ParsingResult::Concat {
                 args: vec![ConcatArg::Char(c)],
@@ -112,9 +113,10 @@ impl From<ConcatArg> for ParsingResult {
 impl From<StarArg> for ParsingResult {
     fn from(value: StarArg) -> Self {
         match value {
-            StarArg::Alt { args, accepts_empty } => {
-                ParsingResult::Alt { args, accepts_empty }
-            }
+            StarArg::Alt { args, accepts_empty } => ParsingResult::Alt {
+                args: LinkedList::from_iter(args),
+                accepts_empty,
+            },
             StarArg::Concat { args, accepts_empty } => {
                 ParsingResult::Concat { args, accepts_empty }
             }
@@ -126,7 +128,7 @@ impl From<ParsingResult> for ConcatArg {
     fn from(value: ParsingResult) -> Self {
         match value {
             ParsingResult::Alt { args, accepts_empty } => {
-                ConcatArg::Alt { args, accepts_empty }
+                ConcatArg::Alt { args: Vec::from_iter(args), accepts_empty }
             }
             ParsingResult::Concat { args, accepts_empty } => {
                 unreachable!("concat cannot have concat as a child");
@@ -154,7 +156,7 @@ impl From<ParsingResult> for StarArg {
     fn from(value: ParsingResult) -> Self {
         match value {
             ParsingResult::Alt { args, accepts_empty } => {
-                StarArg::Alt { args, accepts_empty }
+                StarArg::Alt { args: Vec::from_iter(args), accepts_empty }
             }
             ParsingResult::Concat { args, accepts_empty } => {
                 StarArg::Concat { args, accepts_empty }
@@ -207,7 +209,10 @@ impl<'a> Parser<'a> {
                 AltArg::Star(arg) => return ParsingResult::Star(arg),
             }
         }
-        ParsingResult::Alt { args: alt_args, accepts_empty: alt_accepts_empty }
+        ParsingResult::Alt {
+            args: LinkedList::from_iter(alt_args),
+            accepts_empty: alt_accepts_empty,
+        }
     }
 
     fn expect_unary(&mut self) -> ParsingResult {
@@ -224,7 +229,7 @@ impl<'a> Parser<'a> {
                             ParsingResult::Alt { args, accepts_empty } => {
                                 unary_concat_accepts_empty &= accepts_empty;
                                 unary_concat_args.push(ConcatArg::Alt {
-                                    args,
+                                    args: Vec::from_iter(args),
                                     accepts_empty,
                                 });
                             }
@@ -278,7 +283,10 @@ impl<'a> Parser<'a> {
             match last_concat {
                 ParsingResult::Alt { args, accepts_empty } => {
                     unary_concat_args.push(ConcatArg::Star(Box::new(
-                        StarArg::Alt { args, accepts_empty },
+                        StarArg::Alt {
+                            args: Vec::from_iter(args),
+                            accepts_empty,
+                        },
                     )));
                 }
                 ParsingResult::Concat { args, accepts_empty } => {
@@ -295,7 +303,10 @@ impl<'a> Parser<'a> {
             let last = unary_concat_args.pop().unwrap();
             match last {
                 ConcatArg::Alt { args, accepts_empty } => {
-                    return ParsingResult::Alt { args, accepts_empty };
+                    return ParsingResult::Alt {
+                        args: LinkedList::from_iter(args),
+                        accepts_empty,
+                    };
                 }
                 ConcatArg::Star(arg) => {
                     return ParsingResult::Star(arg);
@@ -377,6 +388,7 @@ impl<'a> Parser<'a> {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::LinkedList;
     use std::vec;
 
     use super::Parser;
@@ -407,7 +419,7 @@ mod tests {
         let res = parser.parse(expr);
 
         let expected = ParsingResult::Alt {
-            args: vec![
+            args: LinkedList::from([
                 AltArg::Concat {
                     args: vec![
                         ConcatArg::Char('a'),
@@ -424,7 +436,7 @@ mod tests {
                     ],
                     accepts_empty: false,
                 },
-            ],
+            ]),
             accepts_empty: false,
         };
         assert_eq!(expected, res);
@@ -593,7 +605,7 @@ mod tests {
 
         let res = parser.parse(expr);
         let expected = ParsingResult::Alt {
-            args: vec![
+            args: LinkedList::from([
                 AltArg::Concat {
                     args: vec![ConcatArg::Char('a')],
                     accepts_empty: false,
@@ -610,7 +622,7 @@ mod tests {
                     args: vec![ConcatArg::Char('d')],
                     accepts_empty: false,
                 },
-            ],
+            ]),
             accepts_empty: false,
         };
         assert_eq!(expected, res);
@@ -647,7 +659,7 @@ mod tests {
 
         let res = parser.parse(expr);
         let expected = ParsingResult::Alt {
-            args: vec![
+            args: LinkedList::from([
                 AltArg::Concat {
                     args: vec![
                         ConcatArg::Star(Box::new(StarArg::Concat {
@@ -690,7 +702,7 @@ mod tests {
                     ],
                     accepts_empty: false,
                 },
-            ],
+            ]),
             accepts_empty: false,
         };
 
