@@ -6,14 +6,16 @@ use std::{
 use crate::parser::{AltArg, ConcatArg, StarArg};
 
 use super::parser::ParsingResult;
+//
+// TODO: ДОБАВТЬ В НАЧАЛО HEAD_ITEM
 
-fn simplify(arg: ParsingResult) -> ParsingResult {
+pub fn simplify(arg: ParsingResult) -> ParsingResult {
     match arg {
         ParsingResult::Alt {
             args: mut alt_args,
             accepts_empty: alt_accepts_empty,
         } => {
-            let head_item = alt_args.front().unwrap();
+            let head_item = alt_args.pop_front().unwrap();
             match head_item {
                 AltArg::Concat { args: mut first_args, accepts_empty } => {
                     let mut head_trim_number: usize = 0;
@@ -27,7 +29,7 @@ fn simplify(arg: ParsingResult) -> ParsingResult {
                         let item_repr =
                             first_args[head_trim_number].to_string();
                         let can_distribute =
-                            alt_args.iter().skip(1).all(|item| match item {
+                            alt_args.iter().all(|item| match item {
                                 AltArg::Concat { args, accepts_empty } => {
                                     if head_trim_number == args.len() {
                                         can_trim_further = false;
@@ -41,7 +43,7 @@ fn simplify(arg: ParsingResult) -> ParsingResult {
                                 AltArg::Star(_) => false,
                             });
                         if can_distribute {
-                            match first_args[head_trim_number] {
+                            match &first_args[head_trim_number] {
                                 ConcatArg::Alt { args, accepts_empty } => {
                                     head_accepts_empty &= accepts_empty;
                                 }
@@ -69,7 +71,7 @@ fn simplify(arg: ParsingResult) -> ParsingResult {
                             [first_args.len() - (tail_trim_number + 1)]
                             .to_string();
                         let can_distribute =
-                            alt_args.iter().skip(1).all(|item| match item {
+                            alt_args.iter().all(|item| match item {
                                 AltArg::Concat { args, accepts_empty } => {
                                     if head_trim_number + tail_trim_number
                                         == args.len()
@@ -86,7 +88,7 @@ fn simplify(arg: ParsingResult) -> ParsingResult {
                                 AltArg::Star(_) => false,
                             });
                         if can_distribute {
-                            match first_args
+                            match &first_args
                                 [first_args.len() - (tail_trim_number + 1)]
                             {
                                 ConcatArg::Alt { args, accepts_empty } => {
@@ -114,9 +116,12 @@ fn simplify(arg: ParsingResult) -> ParsingResult {
                     if tail_trim_number > 0 {
                         tail = first_args
                             .split_off(first_args.len() - tail_trim_number);
-                        alt_args.iter_mut().skip(1).for_each(|item| {
-                            let AltArg::Concat { args, accepts_empty } = item;
-                            args.truncate(args.len() - tail_trim_number);
+
+                        alt_args.iter_mut().for_each(|item| match item {
+                            AltArg::Concat { args, accepts_empty } => {
+                                args.truncate(args.len() - tail_trim_number);
+                            }
+                            AltArg::Star(_) => unreachable!(),
                         })
                     } else {
                         tail = vec![];
@@ -125,47 +130,66 @@ fn simplify(arg: ParsingResult) -> ParsingResult {
                     if head_trim_number > 0 {
                         head = first_args.split_off(head_trim_number);
                         (first_args, head) = (head, first_args);
-                        alt_args.iter_mut().skip(1).for_each(|item| {
-                            let AltArg::Concat { args, accepts_empty } = item;
-                            let t = args.split_off(head_trim_number);
-                            *args = t;
+
+                        alt_args.iter_mut().for_each(|item| match item {
+                            AltArg::Concat { args, accepts_empty } => {
+                                let t = args.split_off(head_trim_number);
+                                *args = t;
+                            }
+                            AltArg::Star(_) => todo!(),
                         })
                     } else {
                         head = vec![];
                     }
+                    alt_args.push_front(AltArg::Concat {
+                        args: first_args,
+                        accepts_empty,
+                    });
 
                     let alt_args_original_length = alt_args.len();
                     let mut remainder_accepts_empty = false;
-                    let seen_alternative_args: HashSet<String> =
+                    let mut seen_alternative_args: HashSet<String> =
                         HashSet::default();
                     alt_args = alt_args
                         .into_iter()
                         .filter(|item| {
-                            let AltArg::Concat { args, accepts_empty } = item;
-                            let current_alt_arg_accepts_empty = true;
-                            args.iter().for_each(|item| match item {
-                                ConcatArg::Alt { args, accepts_empty } => {
-                                    current_alt_arg_accepts_empty &=
-                                        accepts_empty;
+                            match item {
+                                AltArg::Concat { args, accepts_empty } => {
+                                    let mut current_alt_arg_accepts_empty =
+                                        true;
+                                    args.iter().for_each(|item| match item {
+                                        ConcatArg::Alt {
+                                            args,
+                                            accepts_empty,
+                                        } => {
+                                            current_alt_arg_accepts_empty &=
+                                                accepts_empty;
+                                        }
+                                        ConcatArg::Star(_) => (),
+                                        ConcatArg::Char(_) => {
+                                            current_alt_arg_accepts_empty =
+                                                false;
+                                        }
+                                    });
+                                    remainder_accepts_empty |=
+                                        current_alt_arg_accepts_empty;
+                                    if args.len() > 0 {
+                                        // отсев повторений в альтернативе
+                                        let item_repr = item.to_string();
+                                        if seen_alternative_args
+                                            .contains(&item_repr)
+                                        {
+                                            false
+                                        } else {
+                                            seen_alternative_args
+                                                .insert(item_repr);
+                                            true
+                                        }
+                                    } else {
+                                        false
+                                    }
                                 }
-                                ConcatArg::Star(_) => (),
-                                ConcatArg::Char(_) => {
-                                    current_alt_arg_accepts_empty = false;
-                                }
-                            });
-                            remainder_accepts_empty |=
-                                current_alt_arg_accepts_empty;
-                            if args.len() > 0 {
-                                // отсев повторений в альтернативе
-                                let item_repr = item.to_string();
-                                if seen_alternative_args.contains(&item_repr) {
-                                    false
-                                } else {
-                                    seen_alternative_args.insert(item_repr);
-                                    true
-                                }
-                            } else {
-                                false
+                                AltArg::Star(_) => unreachable!(),
                             }
                         })
                         .collect();
@@ -189,15 +213,13 @@ fn simplify(arg: ParsingResult) -> ParsingResult {
                 }
                 AltArg::Star(arg) => {
                     let star_repr = format!("({})*", arg.to_string());
-                    let can_simplify =
-                        alt_args.iter().skip(1).all(|item| match item {
-                            AltArg::Concat { args, accepts_empty } => false,
-                            AltArg::Star(arg) => {
-                                let inner_repr =
-                                    format!("({})*", arg.to_string());
-                                inner_repr == star_repr
-                            }
-                        });
+                    let can_simplify = alt_args.iter().all(|item| match item {
+                        AltArg::Concat { args, accepts_empty } => false,
+                        AltArg::Star(arg) => {
+                            let inner_repr = format!("({})*", arg.to_string());
+                            inner_repr == star_repr
+                        }
+                    });
                     if can_simplify {
                         return ParsingResult::from(
                             alt_args.pop_front().unwrap(),

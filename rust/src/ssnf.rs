@@ -1,4 +1,4 @@
-use std::{borrow::Borrow, vec};
+use std::{borrow::Borrow, collections::LinkedList, vec};
 
 use super::parser::{AltArg, ConcatArg, ParsingResult, StarArg};
 
@@ -12,7 +12,10 @@ pub fn ssnf(arg: ParsingResult) -> ParsingResult {
             new_args.sort_unstable_by(|left, right| {
                 left.to_string().cmp(right.to_string().borrow())
             });
-            ParsingResult::Alt { args: new_args, accepts_empty }
+            ParsingResult::Alt {
+                args: LinkedList::from_iter(new_args),
+                accepts_empty,
+            }
         }
         ParsingResult::Concat { args, accepts_empty } => {
             ParsingResult::Concat {
@@ -21,7 +24,7 @@ pub fn ssnf(arg: ParsingResult) -> ParsingResult {
                     .map(|item| match item {
                         ConcatArg::Alt { args, accepts_empty } => {
                             ConcatArg::from(ssnf(ParsingResult::Alt {
-                                args,
+                                args: LinkedList::from_iter(args),
                                 accepts_empty,
                             }))
                         }
@@ -65,7 +68,7 @@ fn ss(arg: ParsingResult) -> ParsingResult {
                 left.to_string().cmp(right.to_string().borrow())
             });
             ParsingResult::Alt {
-                args: new_args,
+                args: LinkedList::from_iter(new_args),
                 accepts_empty: new_accepts_empty,
             }
         }
@@ -94,7 +97,7 @@ fn ss(arg: ParsingResult) -> ParsingResult {
                     left.to_string().cmp(right.to_string().borrow())
                 });
                 ParsingResult::Alt {
-                    args: alt_args,
+                    args: LinkedList::from_iter(alt_args),
                     accepts_empty: alt_accepts_empty,
                 }
             } else {
@@ -104,7 +107,7 @@ fn ss(arg: ParsingResult) -> ParsingResult {
                         .map(|item| match item {
                             ConcatArg::Alt { args, accepts_empty } => {
                                 ConcatArg::from(ssnf(ParsingResult::Alt {
-                                    args,
+                                    args: LinkedList::from_iter(args),
                                     accepts_empty,
                                 }))
                             }

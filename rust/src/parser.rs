@@ -1,5 +1,6 @@
 use std::{collections::LinkedList, str::Chars, usize, vec};
 
+use super::aci::simplify;
 use crate::ssnf::ssnf;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -174,7 +175,7 @@ impl<'a> Parser<'a> {
         self.expr_iter = Some(regex.chars());
         self.next_char = None;
         let res = self.expect_alternative();
-        ssnf(res)
+        simplify(ssnf(res))
     }
 
     fn expect_alternative(&mut self) -> ParsingResult {
