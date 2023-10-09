@@ -389,7 +389,7 @@ impl<'a> Parser<'a> {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::LinkedList;
+    use std::collections::{vec_deque, LinkedList};
     use std::vec;
 
     use super::Parser;
@@ -739,6 +739,93 @@ mod tests {
         }));
         assert_eq!(expected, res);
     }
+
+    #[test]
+    fn basic_simplification() {
+        let expr = "(aqb|arb|ab)";
+        let mut parser = Parser::default();
+
+        let res = parser.parse(expr);
+        let expected = ParsingResult::Concat {
+            args: vec![
+                ConcatArg::Char('a'),
+                ConcatArg::Alt {
+                    args: vec![
+                        AltArg::Concat { args: vec![], accepts_empty: true },
+                        AltArg::Concat {
+                            args: vec![ConcatArg::Char('q')],
+                            accepts_empty: false,
+                        },
+                        AltArg::Concat {
+                            args: vec![ConcatArg::Char('r')],
+                            accepts_empty: false,
+                        },
+                    ],
+                    accepts_empty: true,
+                },
+                ConcatArg::Char('b'),
+            ],
+            accepts_empty: false,
+        };
+        assert_eq!(expected, res);
+    }
+
+    #[test]
+    fn star_in_alternative() {
+        let expr = "(a*|(a)*)";
+        let mut parser = Parser::default();
+
+        let res = parser.parse(expr);
+        let expected = ParsingResult::Star(Box::new(StarArg::Concat {
+            args: vec![ConcatArg::Char('a')],
+            accepts_empty: false,
+        }));
+        assert_eq!(expected, res);
+    }
+
+    #[test]
+    fn hard_simplification() {
+        let expr = "(a)*r(c|d)|a*q(d|c)";
+        let mut parser = Parser::default();
+        let res = parser.parse(expr);
+        let expected = ParsingResult::Concat {
+            args: vec![
+                ConcatArg::Star(Box::new(StarArg::Concat {
+                    args: vec![ConcatArg::Char('a')],
+                    accepts_empty: false,
+                })),
+                ConcatArg::Alt {
+                    args: vec![
+                        AltArg::Concat {
+                            args: vec![ConcatArg::Char('q')],
+                            accepts_empty: false,
+                        },
+                        AltArg::Concat {
+                            args: vec![ConcatArg::Char('r')],
+                            accepts_empty: false,
+                        },
+                    ],
+                    accepts_empty: false,
+                },
+                ConcatArg::Alt {
+                    args: vec![
+                        AltArg::Concat {
+                            args: vec![ConcatArg::Char('c')],
+                            accepts_empty: false,
+                        },
+                        AltArg::Concat {
+                            args: vec![ConcatArg::Char('d')],
+                            accepts_empty: false,
+                        },
+                    ],
+                    accepts_empty: false,
+                },
+            ],
+            accepts_empty: false,
+        };
+        assert_eq!(expected, res);
+    }
+
     #[test]
     fn star_simplification() {
         let expr = "((bcd)*(abc)*)**a***(((abc)*)**)***";
