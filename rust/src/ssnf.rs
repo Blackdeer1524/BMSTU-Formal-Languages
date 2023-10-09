@@ -1,232 +1,179 @@
+use std::vec;
+
 use super::parser::{AltArg, ConcatArg, ParsingResult, StarArg};
 
 pub fn ssnf(arg: ParsingResult) -> ParsingResult {
-    let result: ParsingResult;
     match arg {
-        ParsingResult::Alt { args, accepts_empty } => {
-            result = ParsingResult::Alt {
+        ParsingResult::Alt { args, accepts_empty } => ParsingResult::Alt {
+            args: args
+                .into_iter()
+                .map(|item| AltArg::from(ssnf(ParsingResult::from(item))))
+                .collect(),
+            accepts_empty,
+        },
+        ParsingResult::Concat { args, accepts_empty } => {
+            ParsingResult::Concat {
                 args: args
                     .into_iter()
-                    .map(|item| {
-                        let res = ssnf(ParsingResult::from(item));
-                        AltArg::from(res)
+                    .map(|item| match item {
+                        ConcatArg::Alt { args, accepts_empty } => {
+                            ConcatArg::from(ssnf(ParsingResult::Alt {
+                                args,
+                                accepts_empty,
+                            }))
+                        }
+                        ConcatArg::Star(arg) => {
+                            ConcatArg::from(ssnf(ParsingResult::Star(arg)))
+                        }
+                        ConcatArg::Char(c) => ConcatArg::Char(c),
                     })
                     .collect(),
                 accepts_empty,
             }
         }
-        ParsingResult::Concat {
-            args,
-            mut body_accepts_empty,
-            mut tail_accepts_empty,
-            parenthesized,
-        } => {
-            body_accepts_empty = true;
-            tail_accepts_empty = true;
-            let new_args: Vec<ConcatArg> = args
-                .into_iter()
-                .map(|item| {
-                    let res = ssnf(ParsingResult::from(item));
-                    body_accepts_empty &= tail_accepts_empty;
-                    match res {
-                        ParsingResult::Alt { args, accepts_empty } => {
-                            tail_accepts_empty = accepts_empty;
-                            ConcatArg::Alt { args, accepts_empty }
-                        }
-                        ParsingResult::Concat {
-                            args,
-                            body_accepts_empty: inner_body_accepts_empty,
-                            tail_accepts_empty: inner_tail_accepts_empty,
-                            parenthesized,
-                        } => {
-                            tail_accepts_empty = inner_body_accepts_empty
-                                && inner_tail_accepts_empty;
-                            ConcatArg::Concat {
-                                args,
-                                body_accepts_empty: inner_body_accepts_empty,
-                                tail_accepts_empty: inner_tail_accepts_empty,
-                            }
-                        }
-                        ParsingResult::Star(arg) => {
-                            tail_accepts_empty = true;
-                            ConcatArg::Star(arg)
-                        }
-                        ParsingResult::Regex { arg, parenthesized } => {
-                            tail_accepts_empty = false;
-                            ConcatArg::Regex { arg, parenthesized }
-                        }
-                    }
-                })
-                .collect();
-            result = ParsingResult::Concat {
-                args: new_args,
-                body_accepts_empty,
-                tail_accepts_empty,
-                parenthesized,
-            };
-        }
-        ParsingResult::Star(arg) => {
-            let intermediate = ss(ParsingResult::from(*arg));
-            result = ParsingResult::Star(Box::new(StarArg::from(intermediate)));
-        }
-        ParsingResult::Regex { arg, parenthesized } => {
-            result = ParsingResult::Regex { arg, parenthesized }
-        }
+        ParsingResult::Star(arg) => ParsingResult::Star(Box::new(
+            StarArg::from(ss(ParsingResult::from(*arg))),
+        )),
     }
-    result
 }
 
 fn ss(arg: ParsingResult) -> ParsingResult {
-    let result: ParsingResult;
     match arg {
-        ParsingResult::Alt { mut args, mut accepts_empty } => {
-            accepts_empty = true;
-            let mut tail_args: Vec<AltArg> = vec![];
-            let mut new_args = args
-                .into_iter()
-                .map(|item| {
+        ParsingResult::Alt { args, accepts_empty } => {
+            let mut new_args: Vec<AltArg> = vec![];
+            let mut new_accepts_empty = true;
+            args.into_iter().for_each(|item| {
+                let res = ss(ParsingResult::from(item));
+                match res {
+                    ParsingResult::Alt { args, accepts_empty } => {
+                        new_accepts_empty &= accepts_empty;
+                        new_args.extend(args);
+                    }
+                    ParsingResult::Concat { args, accepts_empty } => {
+                        new_accepts_empty &= accepts_empty;
+                        new_args.push(AltArg::Concat { args, accepts_empty })
+                    }
+                    ParsingResult::Star(arg) => {
+                        unreachable!();
+                        // match *arg {
+                        //     StarArg::Alt { args, accepts_empty } => {
+                        //         new_accepts_empty &= accepts_empty;
+                        //         new_args.extend(args);
+                        //     }
+                        //     StarArg::Concat { args, accepts_empty } => {
+                        //         new_accepts_empty &= accepts_empty;
+                        //         new_args.push(AltArg::Concat {
+                        //             args,
+                        //             accepts_empty,
+                        //         })
+                        //     }
+                        // }
+                    }
+                }
+            });
+            ParsingResult::Alt {
+                args: new_args,
+                accepts_empty: new_accepts_empty,
+            }
+        }
+        ParsingResult::Concat { args, accepts_empty } => {
+            if accepts_empty {
+                let mut alt_args: Vec<AltArg> = vec![];
+                let mut alt_accepts_empty = false;
+                args.into_iter().for_each(|item| {
                     let res = ss(ParsingResult::from(item));
                     match res {
-                        ParsingResult::Alt {
-                            mut args,
-                            accepts_empty: inner_accepts_empty,
-                        } => {
-                            accepts_empty &= inner_accepts_empty;
-                            let alt_arg = args.pop().expect(
-                                "there will always be at least 2 arguments",
-                            );
-                            tail_args.append(&mut args);
-                            alt_arg
+                        ParsingResult::Alt { args, accepts_empty } => {
+                            alt_accepts_empty &= accepts_empty;
+                            alt_args.extend(args);
                         }
-                        ParsingResult::Concat {
-                            args,
-                            body_accepts_empty,
-                            tail_accepts_empty,
-                            parenthesized,
-                        } => {
-                            accepts_empty &=
-                                body_accepts_empty && tail_accepts_empty;
-                            AltArg::Concat {
-                                args,
-                                body_accepts_empty,
-                                tail_accepts_empty,
-                            }
+                        ParsingResult::Concat { args, accepts_empty } => {
+                            alt_accepts_empty &= accepts_empty;
+                            alt_args
+                                .push(AltArg::Concat { args, accepts_empty });
                         }
-                        ParsingResult::Star(arg) => AltArg::Star(arg),
-                        ParsingResult::Regex { arg, parenthesized } => {
-                            accepts_empty = false;
-                            AltArg::Regex { arg, parenthesized }
+                        ParsingResult::Star(arg) => {
+                            unreachable!();
+                            // match *arg {
+                            //     StarArg::Alt { args, accepts_empty } => {
+                            //         alt_accepts_empty &= accepts_empty;
+                            //         alt_args.extend(args);
+                            //     }
+                            //     StarArg::Concat { args, accepts_empty } => {
+                            //         alt_accepts_empty &= accepts_empty;
+                            //         alt_args.push(AltArg::Concat {
+                            //             args,
+                            //             accepts_empty,
+                            //         })
+                            //     }
+                            // }
                         }
                     }
-                })
-                .collect::<Vec<AltArg>>();
-            new_args.extend(tail_args.into_iter());
-            new_args.sort_unstable_by(|left, right| {
-                left.to_string().cmp(&right.to_string())
-            });
-            result = ParsingResult::Alt { args: new_args, accepts_empty };
-        }
-        ParsingResult::Concat {
-            mut args,
-            body_accepts_empty,
-            tail_accepts_empty,
-            parenthesized,
-        } => {
-            if body_accepts_empty && tail_accepts_empty {
-                let mut new_accepts_empty = true;
-                let mut tail_alt_arg: Vec<AltArg> = vec![];
-                let mut new_args = args
-                    .into_iter()
-                    .map(|item| {
-                        let res = ss(ParsingResult::from(item));
-                        match res {
-                            ParsingResult::Alt { mut args, accepts_empty } => {
-                                new_accepts_empty &= accepts_empty;
-                                let last = args.pop().expect(
-                                    "there will always be at least 2 arguments",
-                                );
-                                tail_alt_arg.append(&mut args);
-                                last
-                            }
-                            ParsingResult::Concat {
-                                args,
-                                body_accepts_empty,
-                                tail_accepts_empty,
-                                parenthesized,
-                            } => {
-                                new_accepts_empty &=
-                                    body_accepts_empty && tail_accepts_empty;
-                                AltArg::Concat {
-                                    args,
-                                    body_accepts_empty,
-                                    tail_accepts_empty,
-                                }
-                            }
-                            ParsingResult::Star(arg) => AltArg::Star(arg),
-                            ParsingResult::Regex { arg, parenthesized } => {
-                                new_accepts_empty = false;
-                                AltArg::Regex { arg, parenthesized }
-                            }
-                        }
-                    })
-                    .collect::<Vec<AltArg>>();
-                new_args.append(&mut tail_alt_arg);
-                new_args.sort_unstable_by(|left, right| {
-                    left.to_string().cmp(&right.to_string())
                 });
-                result = ParsingResult::Alt {
-                    args: new_args,
-                    accepts_empty: new_accepts_empty,
-                };
+                ParsingResult::Alt {
+                    args: alt_args,
+                    accepts_empty: alt_accepts_empty,
+                }
             } else {
-                let mut new_tail_accepts_empty = true;
-                let mut new_body_accepts_empty = true;
-                args = args
-                    .into_iter()
-                    .map(|item| {
-                        let res = ssnf(ParsingResult::from(item));
-                        new_body_accepts_empty &= new_tail_accepts_empty;
-                        match res {
-                            ParsingResult::Alt { args, accepts_empty } => {
-                                new_tail_accepts_empty &= accepts_empty;
-                                ConcatArg::Alt { args, accepts_empty }
-                            }
-                            ParsingResult::Concat {
-                                args,
-                                body_accepts_empty,
-                                tail_accepts_empty,
-                                parenthesized,
-                            } => {
-                                new_tail_accepts_empty &=
-                                    body_accepts_empty && tail_accepts_empty;
-                                ConcatArg::Concat {
+                ParsingResult::Concat {
+                    args: args
+                        .into_iter()
+                        .map(|item| match item {
+                            ConcatArg::Alt { args, accepts_empty } => {
+                                ConcatArg::from(ssnf(ParsingResult::Alt {
                                     args,
-                                    body_accepts_empty,
-                                    tail_accepts_empty,
-                                }
+                                    accepts_empty,
+                                }))
                             }
-                            ParsingResult::Star(arg) => ConcatArg::Star(arg),
-                            ParsingResult::Regex { arg, parenthesized } => {
-                                new_tail_accepts_empty = false;
-                                ConcatArg::Regex { arg, parenthesized }
+                            ConcatArg::Star(arg) => {
+                                ConcatArg::from(ssnf(ParsingResult::Star(arg)))
                             }
-                        }
-                    })
-                    .collect();
-                result = ParsingResult::Concat {
-                    args,
-                    body_accepts_empty: new_body_accepts_empty,
-                    tail_accepts_empty: new_tail_accepts_empty,
-                    parenthesized,
+                            ConcatArg::Char(c) => ConcatArg::Char(c),
+                        })
+                        .collect(),
+                    accepts_empty,
                 }
             }
         }
         ParsingResult::Star(arg) => {
-            result = ParsingResult::from(*arg);
+            ss(ParsingResult::from(*arg))
+            // match *arg {
+            //     StarArg::Alt { args, accepts_empty } => {
+            //         let mut new_alt_args: Vec<AltArg> = vec![];
+            //         let mut new_accepts_emtpy = true;
+            //         args.into_iter().for_each(|item| {
+            //             let res = ss(ParsingResult::from(item));
+            //             match res {
+            //                 ParsingResult::Alt { args, accepts_empty } => {
+            //                     new_accepts_emtpy &= accepts_empty;
+            //                     new_alt_args.extend(args);
+            //                 }
+            //                 ParsingResult::Concat { args, accepts_empty } => {
+            //                     new_accepts_emtpy &= accepts_empty;
+            //                     new_alt_args.push(AltArg::Concat {
+            //                         args,
+            //                         accepts_empty,
+            //                     })
+            //                 }
+            //                 ParsingResult::Star(arg) => match *arg {
+            //                     StarArg::Alt { args, accepts_empty } => {
+            //                         new_accepts_emtpy &= accepts_empty;
+            //                         new_alt_args.extend(args);
+            //                     }
+            //                     StarArg::Concat { args, accepts_empty } => {
+            //                         new_accepts_emtpy &= accepts_empty;
+            //                         new_alt_args.push(AltArg::Concat {
+            //                             args,
+            //                             accepts_empty,
+            //                         })
+            //                     }
+            //                 },
+            //             }
+            //         });
+            //         ParsingResult::
+            //     }
+            //     StarArg::Concat { args, accepts_empty } => todo!(),
+            // }
         }
-        ParsingResult::Regex { arg, parenthesized } => {
-            result = ParsingResult::Regex { arg, parenthesized }
-        }
-    };
-    result
+    }
 }
