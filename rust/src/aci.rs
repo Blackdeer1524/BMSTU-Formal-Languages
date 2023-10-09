@@ -109,7 +109,6 @@ pub fn simplify(arg: ParsingResult) -> ParsingResult {
                             args: first_args,
                             accepts_empty,
                         });
-
                         return ParsingResult::Alt {
                             args: alt_args,
                             accepts_empty: alt_accepts_empty,
@@ -119,7 +118,6 @@ pub fn simplify(arg: ParsingResult) -> ParsingResult {
                     if tail_trim_number > 0 {
                         tail = first_args
                             .split_off(first_args.len() - tail_trim_number);
-
                         alt_args.iter_mut().for_each(|item| match item {
                             AltArg::Concat { args, accepts_empty } => {
                                 args.truncate(args.len() - tail_trim_number);
@@ -196,16 +194,20 @@ pub fn simplify(arg: ParsingResult) -> ParsingResult {
                             }
                         })
                         .collect();
-                    if alt_args_original_length != alt_args.len() {
-                        alt_args.push_front(AltArg::Concat {
-                            args: vec![], // типа epsilon
-                            accepts_empty: true,
+
+                    if !alt_args.is_empty() {
+                        if alt_args_original_length != alt_args.len() {
+                            alt_args.push_front(AltArg::Concat {
+                                args: vec![], // типа epsilon
+                                accepts_empty: true,
+                            });
+                        }
+                        head.push(ConcatArg::Alt {
+                            args: Vec::from_iter(alt_args),
+                            accepts_empty: remainder_accepts_empty,
                         });
                     }
-                    head.push(ConcatArg::Alt {
-                        args: Vec::from_iter(alt_args),
-                        accepts_empty: remainder_accepts_empty,
-                    });
+
                     head.extend(tail);
                     return ParsingResult::Concat {
                         args: head,

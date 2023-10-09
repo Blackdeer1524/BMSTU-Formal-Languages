@@ -784,6 +784,18 @@ mod tests {
     }
 
     #[test]
+    fn full_simplification() {
+        let expr = "(a|a)";
+        let mut parser = Parser::default();
+        let res = parser.parse(expr);
+        let expected = ParsingResult::Concat {
+            args: vec![ConcatArg::Char('a')],
+            accepts_empty: false,
+        };
+        assert_eq!(expected, res);
+    }
+
+    #[test]
     fn hard_simplification() {
         let expr = "(a)*r(c|d)|a*q(d|c)";
         let mut parser = Parser::default();
