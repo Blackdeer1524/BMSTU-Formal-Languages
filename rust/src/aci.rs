@@ -1,4 +1,7 @@
-use std::collections::LinkedList;
+use std::{
+    borrow::Borrow,
+    collections::{HashSet, LinkedList},
+};
 
 use crate::parser::{AltArg, ConcatArg, StarArg};
 
@@ -131,23 +134,46 @@ fn simplify(arg: ParsingResult) -> ParsingResult {
                         head = vec![];
                     }
 
-                    let mut remainder_accepts_empty = true;
+                    let alt_args_original_length = alt_args.len();
+                    let mut remainder_accepts_empty = false;
+                    let seen_alternative_args: HashSet<String> =
+                        HashSet::default();
                     alt_args = alt_args
                         .into_iter()
                         .filter(|item| {
                             let AltArg::Concat { args, accepts_empty } = item;
-                            remainder_accepts_empty &= accepts_empty;
-                            args.len() > 0
+                            let current_alt_arg_accepts_empty = true;
+                            args.iter().for_each(|item| match item {
+                                ConcatArg::Alt { args, accepts_empty } => {
+                                    current_alt_arg_accepts_empty &=
+                                        accepts_empty;
+                                }
+                                ConcatArg::Star(_) => (),
+                                ConcatArg::Char(_) => {
+                                    current_alt_arg_accepts_empty = false;
+                                }
+                            });
+                            remainder_accepts_empty |=
+                                current_alt_arg_accepts_empty;
+                            if args.len() > 0 {
+                                // отсев повторений в альтернативе
+                                let item_repr = item.to_string();
+                                if seen_alternative_args.contains(&item_repr) {
+                                    false
+                                } else {
+                                    seen_alternative_args.insert(item_repr);
+                                    true
+                                }
+                            } else {
+                                false
+                            }
                         })
                         .collect();
-
-                    if alt_args.len() == 0 {
-                        head.extend(tail);
-                        return ParsingResult::Concat {
-                            args: head,
-                            accepts_empty: head_accepts_empty
-                                && tail_accepts_empty,
-                        };
+                    if alt_args_original_length != alt_args.len() {
+                        alt_args.push_front(AltArg::Concat {
+                            args: vec![], // типа epsilon
+                            accepts_empty: true,
+                        });
                     }
                     head.push(ConcatArg::Alt {
                         args: Vec::from_iter(alt_args),
