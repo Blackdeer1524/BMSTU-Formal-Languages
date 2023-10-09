@@ -6,8 +6,6 @@ use std::{
 use crate::parser::{AltArg, ConcatArg, StarArg};
 
 use super::parser::ParsingResult;
-//
-// TODO: ДОБАВТЬ В НАЧАЛО HEAD_ITEM
 
 pub fn simplify(arg: ParsingResult) -> ParsingResult {
     match arg {
@@ -107,6 +105,11 @@ pub fn simplify(arg: ParsingResult) -> ParsingResult {
                     }
 
                     if head_trim_number == 0 && tail_trim_number == 0 {
+                        alt_args.push_front(AltArg::Concat {
+                            args: first_args,
+                            accepts_empty,
+                        });
+
                         return ParsingResult::Alt {
                             args: alt_args,
                             accepts_empty: alt_accepts_empty,
