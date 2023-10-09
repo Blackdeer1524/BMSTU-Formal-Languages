@@ -738,17 +738,17 @@ mod tests {
                     args: vec![
                         AltArg::Concat {
                             args: vec![
+                                ConcatArg::Char('a'),
                                 ConcatArg::Char('b'),
                                 ConcatArg::Char('c'),
-                                ConcatArg::Char('d'),
                             ],
                             accepts_empty: false,
                         },
                         AltArg::Concat {
                             args: vec![
-                                ConcatArg::Char('a'),
                                 ConcatArg::Char('b'),
                                 ConcatArg::Char('c'),
+                                ConcatArg::Char('d'),
                             ],
                             accepts_empty: false,
                         },

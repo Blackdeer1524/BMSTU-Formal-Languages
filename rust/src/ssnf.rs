@@ -1,16 +1,19 @@
-use std::vec;
+use std::{borrow::Borrow, vec};
 
 use super::parser::{AltArg, ConcatArg, ParsingResult, StarArg};
 
 pub fn ssnf(arg: ParsingResult) -> ParsingResult {
     match arg {
-        ParsingResult::Alt { args, accepts_empty } => ParsingResult::Alt {
-            args: args
+        ParsingResult::Alt { args, accepts_empty } => {
+            let mut new_args: Vec<AltArg> = args
                 .into_iter()
                 .map(|item| AltArg::from(ssnf(ParsingResult::from(item))))
-                .collect(),
-            accepts_empty,
-        },
+                .collect();
+            new_args.sort_unstable_by(|left, right| {
+                left.to_string().cmp(right.to_string().borrow())
+            });
+            ParsingResult::Alt { args: new_args, accepts_empty }
+        }
         ParsingResult::Concat { args, accepts_empty } => {
             ParsingResult::Concat {
                 args: args
@@ -58,6 +61,9 @@ fn ss(arg: ParsingResult) -> ParsingResult {
                     }
                 }
             });
+            new_args.sort_unstable_by(|left, right| {
+                left.to_string().cmp(right.to_string().borrow())
+            });
             ParsingResult::Alt {
                 args: new_args,
                 accepts_empty: new_accepts_empty,
@@ -83,6 +89,9 @@ fn ss(arg: ParsingResult) -> ParsingResult {
                             unreachable!();
                         }
                     }
+                });
+                alt_args.sort_unstable_by(|left, right| {
+                    left.to_string().cmp(right.to_string().borrow())
                 });
                 ParsingResult::Alt {
                     args: alt_args,
