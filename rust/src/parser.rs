@@ -159,7 +159,9 @@ impl<'a> Parser<'a> {
         self.expr_iter = Some(regex.chars());
         self.next_char = None;
         let res = self.expect_alternative();
-        simplify(ssnf(res))
+        let after_ssnf = ssnf(res);
+        let after_simplification = simplify(after_ssnf);
+        after_simplification
     }
 
     fn expect_alternative(&mut self) -> ParsingResult {
@@ -435,6 +437,31 @@ mod tests {
             accepts_empty: false,
         }));
 
+        assert_eq!(expected, res);
+    }
+
+    #[test]
+    fn empty_alternative_under_star() {
+        let expr = "(a*b|b)*";
+        // (a*b|b)* = ((eps|a*)b)*
+        let mut parser = Parser::default();
+        let res = parser.parse(expr);
+        let expected = ParsingResult::Star(Box::new(StarArg::Concat {
+            args: vec![
+                ConcatArg::Alt {
+                    args: vec![
+                        AltArg::Concat { args: vec![], accepts_empty: true },
+                        AltArg::Star(Box::new(StarArg::Concat {
+                            args: vec![ConcatArg::Char('a')],
+                            accepts_empty: false,
+                        })),
+                    ],
+                    accepts_empty: true,
+                },
+                ConcatArg::Char('b'),
+            ],
+            accepts_empty: false,
+        }));
         assert_eq!(expected, res);
     }
 

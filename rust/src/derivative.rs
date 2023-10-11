@@ -82,6 +82,9 @@ pub fn take_derivative(arg: ParsingResult, symbol: char) -> Option<ParsingResult
             })
         }
         ParsingResult::Concat { mut args, accepts_empty: main_accepts_empty } => {
+            if args.is_empty() {
+                return None;
+            }
             if args.len() == 1 {
                 if let ConcatArg::Char(c) = args.last().unwrap() {
                     if *c == symbol {
@@ -113,7 +116,6 @@ pub fn take_derivative(arg: ParsingResult, symbol: char) -> Option<ParsingResult
                 let item = args.pop().unwrap();
 
                 args = tail.clone();
-
                 let derivative_opt = take_derivative(ParsingResult::from(item.clone()), symbol);
                 if derivative_opt.is_none() {
                     break;
@@ -232,7 +234,7 @@ mod tests {
     }
 
     #[test]
-    fn empty() {
+    fn empty_concat() {
         let expr = "a";
         let mut parser = Parser::default();
 
@@ -341,6 +343,66 @@ mod tests {
             ]),
             accepts_empty: true,
         };
+        assert_eq!(expected, derivative.unwrap());
+    }
+
+    // #[test]
+    fn chain_rule() {
+        let expr = "(a*b|b)*";
+        // (a*b|b)* = ((eps|a*)b)*
+        // Da(((eps|a*)b)*) = Da((eps|a*)b)((eps|a*)b)* 
+        // = a*b((eps|a*)b)*
+        let mut parser = Parser::default();
+
+        let res = parser.parse(expr);
+        let derivative = take_derivative(res, 'a');
+        assert!(derivative.is_some());
+        let expected = ParsingResult::Concat {
+            args: vec![
+                ConcatArg::Star(Box::new(StarArg::Concat {
+                    args: vec![ConcatArg::Char('a')],
+                    accepts_empty: false,
+                })),
+                ConcatArg::Char('b'),
+            ],
+            accepts_empty: false,
+        };
+        // let expected = ParsingResult::Alt {
+        //     args: LinkedList::from([
+        //         AltArg::Concat {
+        //             args: vec![
+        //                 ConcatArg::Star(Box::new(StarArg::Concat {
+        //                     args: vec![ConcatArg::Char('a')],
+        //                     accepts_empty: false,
+        //                 })),
+        //                 ConcatArg::Char('b'),
+        //                 ConcatArg::Star(Box::new(StarArg::Alt {
+        //                     args: vec![
+        //                         AltArg::Concat {
+        //                             args: vec![
+        //                                 ConcatArg::Star(Box::new(StarArg::Concat {
+        //                                     args: vec![ConcatArg::Char('a')],
+        //                                     accepts_empty: false,
+        //                                 })),
+        //                                 ConcatArg::Char('b'),
+        //                             ],
+        //                             accepts_empty: false,
+        //                         },
+        //                         AltArg::Concat {
+        //                             args: vec![ConcatArg::Char('b')],
+        //                             accepts_empty: false,
+        //                         },
+        //                     ],
+        //                     accepts_empty: false,
+        //                 })),
+        //                 ConcatArg::Char('a'),
+        //             ],
+        //             accepts_empty: false,
+        //         },
+        //         AltArg::Concat { args: vec![], accepts_empty: true },
+        //     ]),
+        //     accepts_empty: true,
+        // };
         assert_eq!(expected, derivative.unwrap());
     }
 }
