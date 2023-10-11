@@ -1,15 +1,15 @@
 use std::collections::LinkedList;
 use std::ops::Deref;
-use std::vec;
+use std::{cmp, vec};
 
 use crate::parser::AltArg;
 use crate::parser::{ConcatArg, ParsingResult};
 
-fn take_derivative(arg: ParsingResult, symbol: char) -> Option<ParsingResult> {
+pub fn take_derivative(arg: ParsingResult, symbol: char) -> Option<ParsingResult> {
     match arg {
         ParsingResult::Alt { args, accepts_empty } => {
             let mut new_args: Vec<AltArg> = vec![];
-            let mut new_accepts_empty = true;
+            let mut new_accepts_empty = false;
             args.into_iter().for_each(|item| match item {
                 AltArg::Concat { args, accepts_empty } => {
                     let res_opt =
@@ -17,14 +17,15 @@ fn take_derivative(arg: ParsingResult, symbol: char) -> Option<ParsingResult> {
                     if let Some(res) = res_opt {
                         match res {
                             ParsingResult::Alt { args, accepts_empty } => {
-                                new_accepts_empty &= accepts_empty;
+                                new_accepts_empty |= accepts_empty;
                                 new_args.extend(args);
                             }
                             ParsingResult::Concat { args, accepts_empty } => {
-                                new_accepts_empty &= accepts_empty;
+                                new_accepts_empty |= accepts_empty;
                                 new_args.push(AltArg::Concat { args, accepts_empty });
                             }
                             ParsingResult::Star(arg) => {
+                                new_accepts_empty = true;
                                 new_args.push(AltArg::Star(arg));
                             }
                         }
@@ -36,7 +37,7 @@ fn take_derivative(arg: ParsingResult, symbol: char) -> Option<ParsingResult> {
                     if let Some(inner) = inner_opt {
                         match inner {
                             ParsingResult::Alt { args, accepts_empty } => {
-                                new_accepts_empty &= accepts_empty;
+                                new_accepts_empty |= accepts_empty;
                                 new_args.push(AltArg::Concat {
                                     args: vec![
                                         ConcatArg::Alt {
@@ -49,14 +50,22 @@ fn take_derivative(arg: ParsingResult, symbol: char) -> Option<ParsingResult> {
                                 });
                             }
                             ParsingResult::Concat { mut args, accepts_empty } => {
-                                new_accepts_empty &= accepts_empty;
-                                args.push(ConcatArg::Star(arg));
-                                new_args.push(AltArg::Concat { args, accepts_empty });
+                                if args.is_empty() {
+                                    new_accepts_empty = true;
+                                    new_args.push(AltArg::Star(arg));
+                                } else {
+                                    new_accepts_empty |= accepts_empty;
+                                    args.push(ConcatArg::Star(arg));
+                                    new_args.push(AltArg::Concat { args, accepts_empty });
+                                }
                             }
-                            ParsingResult::Star(inner_arg) => new_args.push(AltArg::Concat {
-                                args: vec![ConcatArg::Star(inner_arg), ConcatArg::Star(arg)],
-                                accepts_empty: true,
-                            }),
+                            ParsingResult::Star(inner_arg) => {
+                                new_accepts_empty |= true;
+                                new_args.push(AltArg::Concat {
+                                    args: vec![ConcatArg::Star(inner_arg), ConcatArg::Star(arg)],
+                                    accepts_empty: true,
+                                })
+                            }
                         }
                     }
                 }
@@ -99,7 +108,7 @@ fn take_derivative(arg: ParsingResult, symbol: char) -> Option<ParsingResult> {
                 }
                 empty_accepting_prefix_size += 1;
             }
-            for _ in 0..empty_accepting_prefix_size {
+            for _ in 0..1 + cmp::min(empty_accepting_prefix_size, args.len() - 1) {
                 let tail = args.split_off(1);
                 let item = args.pop().unwrap();
 
@@ -149,10 +158,7 @@ fn take_derivative(arg: ParsingResult, symbol: char) -> Option<ParsingResult> {
                             alt_args
                                 .push(AltArg::Concat { args: t, accepts_empty: main_accepts_empty })
                         } else {
-                            alt_args.push(AltArg::Concat {
-                                args: vec![ConcatArg::Star(arg)],
-                                accepts_empty: main_accepts_empty,
-                            });
+                            alt_args.push(AltArg::Star(arg));
                             alt_accepts_empty = true;
                         }
                     }
@@ -183,6 +189,9 @@ fn take_derivative(arg: ParsingResult, symbol: char) -> Option<ParsingResult> {
                         })
                     }
                     ParsingResult::Concat { mut args, accepts_empty } => {
+                        if args.is_empty() {
+                            return Some(ParsingResult::Star(arg));
+                        }
                         args.push(ConcatArg::Star(arg));
                         return Some(ParsingResult::Concat { args, accepts_empty });
                     }
@@ -196,5 +205,142 @@ fn take_derivative(arg: ParsingResult, symbol: char) -> Option<ParsingResult> {
             }
             None
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{collections::LinkedList, vec};
+
+    use crate::parser::{AltArg, ConcatArg, Parser, ParsingResult, StarArg};
+
+    use super::take_derivative;
+
+    #[test]
+    fn constant() {
+        let expr = "abc";
+        let mut parser = Parser::default();
+
+        let res = parser.parse(expr);
+        let derivative = take_derivative(res, 'a');
+        let expected = ParsingResult::Concat {
+            args: vec![ConcatArg::Char('b'), ConcatArg::Char('c')],
+            accepts_empty: false,
+        };
+        assert!(derivative.is_some());
+        assert_eq!(expected, derivative.unwrap());
+    }
+
+    #[test]
+    fn empty() {
+        let expr = "a";
+        let mut parser = Parser::default();
+
+        let res = parser.parse(expr);
+        let derivative = take_derivative(res, 'a');
+        let expected = ParsingResult::Concat { args: vec![], accepts_empty: true };
+        assert!(derivative.is_some());
+        assert_eq!(expected, derivative.unwrap());
+    }
+
+    #[test]
+    fn alternative() {
+        let expr = "(a|b|ab)";
+        let mut parser = Parser::default();
+
+        let res = parser.parse(expr);
+        let derivative = take_derivative(res, 'a');
+        let expected = ParsingResult::Alt {
+            args: LinkedList::from([
+                AltArg::Concat { args: vec![], accepts_empty: true },
+                AltArg::Concat { args: vec![ConcatArg::Char('b')], accepts_empty: false },
+            ]),
+            accepts_empty: true,
+        };
+        assert!(derivative.is_some());
+        assert_eq!(expected, derivative.unwrap());
+    }
+
+    #[test]
+    fn singular_alternative() {
+        let expr = "(a|b)";
+        let mut parser = Parser::default();
+
+        let res = parser.parse(expr);
+        let derivative = take_derivative(res, 'a');
+        let expected = ParsingResult::Concat { args: vec![], accepts_empty: true };
+        assert!(derivative.is_some());
+        assert_eq!(expected, derivative.unwrap());
+    }
+
+    #[test]
+    fn dead_alternative() {
+        let expr = "(a|b)";
+        let mut parser = Parser::default();
+
+        let res = parser.parse(expr);
+        let derivative = take_derivative(res, 'c');
+        assert!(derivative.is_none());
+    }
+
+    #[test]
+    fn concat_prefix_accepts_empty() {
+        let expr = "a*ab";
+        let mut parser = Parser::default();
+
+        let res = parser.parse(expr);
+        let derivative = take_derivative(res, 'a');
+        assert!(derivative.is_some());
+        let expected = ParsingResult::Alt {
+            args: LinkedList::from([
+                AltArg::Concat {
+                    args: vec![
+                        ConcatArg::Star(Box::new(StarArg::Concat {
+                            args: vec![ConcatArg::Char('a')],
+                            accepts_empty: false,
+                        })),
+                        ConcatArg::Char('a'),
+                        ConcatArg::Char('b'),
+                    ],
+                    accepts_empty: false,
+                },
+                AltArg::Concat { args: vec![ConcatArg::Char('b')], accepts_empty: false },
+            ]),
+            accepts_empty: false,
+        };
+        assert_eq!(expected, derivative.unwrap());
+    }
+
+    #[test]
+    fn concat_accepts_empty() {
+        let expr = "a*a*";
+        let mut parser = Parser::default();
+
+        let res = parser.parse(expr);
+        let derivative = take_derivative(res, 'a');
+        assert!(derivative.is_some());
+        let expected = ParsingResult::Alt {
+            args: LinkedList::from([
+                AltArg::Concat {
+                    args: vec![
+                        ConcatArg::Star(Box::new(StarArg::Concat {
+                            args: vec![ConcatArg::Char('a')],
+                            accepts_empty: false,
+                        })),
+                        ConcatArg::Star(Box::new(StarArg::Concat {
+                            args: vec![ConcatArg::Char('a')],
+                            accepts_empty: false,
+                        })),
+                    ],
+                    accepts_empty: true,
+                },
+                AltArg::Star(Box::new(StarArg::Concat {
+                    args: vec![ConcatArg::Char('a')],
+                    accepts_empty: false,
+                })),
+            ]),
+            accepts_empty: true,
+        };
+        assert_eq!(expected, derivative.unwrap());
     }
 }
