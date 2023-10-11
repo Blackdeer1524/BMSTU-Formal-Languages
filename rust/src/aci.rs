@@ -1,7 +1,4 @@
-use std::{
-    borrow::Borrow,
-    collections::{HashSet, LinkedList},
-};
+use std::collections::{HashSet, LinkedList};
 
 use crate::parser::{AltArg, ConcatArg, StarArg};
 
