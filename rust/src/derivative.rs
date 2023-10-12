@@ -346,11 +346,11 @@ mod tests {
         assert_eq!(expected, derivative.unwrap());
     }
 
-    // #[test]
+    #[test]
     fn chain_rule() {
         let expr = "(a*b|b)*";
         // (a*b|b)* = ((eps|a*)b)*
-        // Da(((eps|a*)b)*) = Da((eps|a*)b)((eps|a*)b)* 
+        // Da(((eps|a*)b)*) = Da((eps|a*)b)((eps|a*)b)*
         // = a*b((eps|a*)b)*
         let mut parser = Parser::default();
 
@@ -364,45 +364,25 @@ mod tests {
                     accepts_empty: false,
                 })),
                 ConcatArg::Char('b'),
+                ConcatArg::Star(Box::new(StarArg::Concat {
+                    args: vec![
+                        ConcatArg::Alt {
+                            args: vec![
+                                AltArg::Concat { args: vec![], accepts_empty: true },
+                                AltArg::Star(Box::new(StarArg::Concat {
+                                    args: vec![ConcatArg::Char('a')],
+                                    accepts_empty: false,
+                                })),
+                            ],
+                            accepts_empty: true,
+                        },
+                        ConcatArg::Char('b'),
+                    ],
+                    accepts_empty: false,
+                })),
             ],
             accepts_empty: false,
         };
-        // let expected = ParsingResult::Alt {
-        //     args: LinkedList::from([
-        //         AltArg::Concat {
-        //             args: vec![
-        //                 ConcatArg::Star(Box::new(StarArg::Concat {
-        //                     args: vec![ConcatArg::Char('a')],
-        //                     accepts_empty: false,
-        //                 })),
-        //                 ConcatArg::Char('b'),
-        //                 ConcatArg::Star(Box::new(StarArg::Alt {
-        //                     args: vec![
-        //                         AltArg::Concat {
-        //                             args: vec![
-        //                                 ConcatArg::Star(Box::new(StarArg::Concat {
-        //                                     args: vec![ConcatArg::Char('a')],
-        //                                     accepts_empty: false,
-        //                                 })),
-        //                                 ConcatArg::Char('b'),
-        //                             ],
-        //                             accepts_empty: false,
-        //                         },
-        //                         AltArg::Concat {
-        //                             args: vec![ConcatArg::Char('b')],
-        //                             accepts_empty: false,
-        //                         },
-        //                     ],
-        //                     accepts_empty: false,
-        //                 })),
-        //                 ConcatArg::Char('a'),
-        //             ],
-        //             accepts_empty: false,
-        //         },
-        //         AltArg::Concat { args: vec![], accepts_empty: true },
-        //     ]),
-        //     accepts_empty: true,
-        // };
         assert_eq!(expected, derivative.unwrap());
     }
 }
