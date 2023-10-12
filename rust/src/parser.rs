@@ -1,6 +1,7 @@
+use std::marker::PhantomData;
 use std::{collections::LinkedList, str::Chars, usize, vec};
 
-use super::aci::simplify;
+use crate::aci::simplify;
 use crate::ssnf::ssnf;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -66,6 +67,7 @@ pub struct Parser<'a> {
     index: usize,
     expr_iter: Option<Chars<'a>>,
     next_char: Option<char>,
+    // _parser_lifetime: PhantomData<&'b ()>,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -73,6 +75,23 @@ pub enum ParsingResult {
     Alt { args: LinkedList<AltArg>, accepts_empty: bool },
     Concat { args: Vec<ConcatArg>, accepts_empty: bool },
     Star(Box<StarArg>),
+}
+
+impl ToString for ParsingResult {
+    fn to_string(&self) -> String {
+        match self {
+            ParsingResult::Alt { args, accepts_empty: _ } => {
+                format!(
+                    "({})",
+                    args.iter().map(|item| { item.to_string() }).collect::<Vec<String>>().join("|")
+                )
+            }
+            ParsingResult::Concat { args, accepts_empty: _ } => {
+                args.iter().map(|item| item.to_string()).collect::<Vec<String>>().join("")
+            }
+            ParsingResult::Star(arg) => format!("({})*", arg.to_string()),
+        }
+    }
 }
 
 impl From<AltArg> for ParsingResult {
@@ -154,11 +173,12 @@ impl From<ParsingResult> for StarArg {
 }
 
 impl<'a> Parser<'a> {
-    pub fn parse(&mut self, regex: &'a str) -> ParsingResult {
+    pub fn parse<'c: 'a>(&'c mut self, regex: &'a str) -> ParsingResult {
         self.index = 0;
         self.expr_iter = Some(regex.chars());
         self.next_char = None;
         let res = self.expect_alternative();
+        self.expr_iter = None;
         let after_ssnf = ssnf(res);
         let after_simplification = simplify(after_ssnf);
         after_simplification
