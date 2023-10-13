@@ -2,37 +2,30 @@ package main
 
 import (
 	"fmt"
-	"github.com/VyacheslavIsWorkingNow/tfl/lab2/internal/gluskov"
-	"github.com/VyacheslavIsWorkingNow/tfl/lab2/internal/parser"
-	"github.com/VyacheslavIsWorkingNow/tfl/lab2/internal/reggen"
+	"github.com/VyacheslavIsWorkingNow/tfl/lab2/internal/wordgen"
 )
 
 func main() {
 	fmt.Println("start")
 
-	regGenerator, _ := reggen.New(1, 5, 3, 15)
+	// TODO: сканирую параметры для генерации регулярок
+	// переношу в reggen.New()
+	//regGenerator, _ := reggen.New(3, 5, 3, 15)
+	//regexes := regGenerator.Generate()
+	//
 
-	regexes := regGenerator.Generate()
+	regex := "((a(abc)*)b*)(c)******"
 
-	fmt.Println("regex:", regexes[0])
+	// TODO: можно сканировать параметры для генерации слов в регулярках (максимальное число накачки и число слов)
 
-	regex := regexes[0]
-
-	_ = parser.ParseRegexInDot(regex)
-
-	tree, err := parser.ParseRegex(regex)
-
+	words, err := wordgen.GenerateWordsForRegex(regex, 15, 5)
 	if err != nil {
-		fmt.Println("беда в парсере", err)
+		fmt.Println("беда в генерации слов")
 	}
 
-	automaton := gluskov.Translate(tree)
-
-	err = automaton.GetDotMachine()
-	if err != nil {
-		fmt.Println("беда с визуализацией автомата", err)
+	fmt.Println("words")
+	for i, w := range words {
+		fmt.Println(i+1, ":", w)
 	}
-
-	fmt.Printf("%+v\n", automaton)
 
 }

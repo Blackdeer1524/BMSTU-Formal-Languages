@@ -1,87 +1,146 @@
 package gluskov
 
 import (
+	"fmt"
 	"regexp/syntax"
 )
 
+type State int
+type StateTransitions map[rune][]State
+
 type Machine struct {
 	StartState   int
-	FinalStates  []int
-	Transitions  map[int]map[rune][]int
+	FinalStates  []State
+	Transitions  map[State]StateTransitions
 	StateCounter int
 }
 
-// Translate TODO: сделать структуру попонятнее
-func Translate(st *syntax.Regexp) *Machine {
+func BuildMachine(st *syntax.Regexp) *Machine {
 	machine := &Machine{
 		StartState:   0,
-		FinalStates:  []int{},
-		Transitions:  make(map[int]map[rune][]int),
+		FinalStates:  make([]State, 0),
+		Transitions:  make(map[State]StateTransitions),
 		StateCounter: 1,
 	}
 
-	machine.buildMachine(st, machine.StartState)
+	machine.handleRegex(st, State(machine.StartState), true)
 
 	return machine
 }
 
-func (m *Machine) buildMachine(node *syntax.Regexp, currentState int) {
+func (m *Machine) handleRegex(node *syntax.Regexp, currentState State, isFinal bool) []State {
 	switch node.Op {
 	case syntax.OpLiteral:
-		m.addLiteral(currentState)
+		return m.handleLiteral(currentState, node, isFinal)
 	case syntax.OpConcat:
-		m.addConcat(currentState)
+		return m.handleConcat(currentState, node, isFinal)
 	case syntax.OpAlternate:
-		m.addAlternate(currentState)
+		return m.handleAlternate(currentState, node, isFinal)
 	case syntax.OpStar:
-		m.addStar(currentState)
+		return m.handleStar(currentState, node, isFinal)
 	case syntax.OpCapture:
-		m.addCapture(currentState)
+		return m.handleCapture(currentState, node, isFinal)
 	case syntax.OpCharClass:
-		m.addCharClass(currentState)
+		return m.handleCharClass(currentState, node, isFinal)
 	}
+	fmt.Println("вот кто вышел за case:", node.Op)
+	return []State{currentState}
 }
 
-// TODO: сделать попонятнее
-func (m *Machine) addTransition(fromState int, symbol rune, toState int) {
+func (m *Machine) addTransition(fromState, toState State, symbol rune) {
 	if _, exists := m.Transitions[fromState]; !exists {
-		m.Transitions[fromState] = make(map[rune][]int)
+		m.Transitions[fromState] = make(StateTransitions)
 	}
 	m.Transitions[fromState][symbol] = append(m.Transitions[fromState][symbol], toState)
 }
 
-// TODO: сделать корректное добавление буквы - новое состояние и соединяем
-// TODO: подумать больше
-func (m *Machine) addLiteral(currentState int) {
-
+func (m *Machine) addState() State {
+	newState := State(m.StateCounter)
+	m.StateCounter++
+	return newState
 }
 
-// TODO: сделать корректное добавление конкатенации - просто соединяем состояния
-// TODO: подумать больше
-func (m *Machine) addConcat(currentState int) {
-
+func (m *Machine) addFinal(s State) {
+	m.FinalStates = append(m.FinalStates, s)
 }
 
-// TODO: сделать корректное добавление альтернативы - еще раз в тетрадь
-// TODO: подумать больше
-func (m *Machine) addAlternate(currentState int) {
-
+func (m *Machine) GetRuneBetweenStates(left, right State) (rune, State) {
+	if right == 0 {
+		return 'я', 0
+	}
+	for r, states := range m.Transitions[left] {
+		for _, s := range states {
+			if s == right {
+				return r, s
+			}
+		}
+	}
+	return m.GetRuneBetweenStates(left, right-1)
 }
 
-// TODO: сделать корректное добавление звезды клини - еще раз нарисовать в тетради
-// TODO: подумать больше
-func (m *Machine) addStar(currentState int) {
-
+func (m *Machine) handleLiteral(currentState State, node *syntax.Regexp, isFinal bool) []State {
+	for _, symbol := range node.Rune {
+		nextState := m.addState()
+		m.addTransition(currentState, nextState, symbol)
+		currentState = nextState
+	}
+	if isFinal {
+		m.addFinal(currentState)
+	}
+	return []State{currentState}
 }
 
-// TODO: сделать корректное добавление захвата - просто провалиться вниз
-// TODO: подумать больше
-func (m *Machine) addCapture(currentState int) {
+func (m *Machine) handleConcat(currentState State, node *syntax.Regexp, isFinal bool) []State {
 
+	leftState := m.handleRegex(node.Sub[0], currentState, false)
+	rightState := m.handleRegex(node.Sub[1], leftState[0], isFinal)
+
+	transition, newRight := m.GetRuneBetweenStates(leftState[0], rightState[0])
+
+	for i := 1; i < len(leftState); i++ {
+		m.addTransition(leftState[i], newRight, transition)
+	}
+
+	return rightState
 }
 
-// TODO: сделать корректное добавление самой внутренней альтернативы (это если (a|b))
-// TODO: подумать больше
-func (m *Machine) addCharClass(currentState int) {
+func (m *Machine) handleAlternate(currentState State, node *syntax.Regexp, isFinal bool) []State {
+	leftState := m.handleRegex(node.Sub[0], currentState, isFinal)
+	rightState := m.handleRegex(node.Sub[1], currentState, isFinal)
 
+	if isFinal {
+		m.addFinal(leftState[0])
+		m.addFinal(rightState[0])
+	}
+	return []State{leftState[0], rightState[0]}
+}
+
+func (m *Machine) handleStar(currentState State, node *syntax.Regexp, isFinal bool) []State {
+	endStarState := m.handleRegex(node.Sub[0], currentState, isFinal)
+
+	translations, _ := m.GetRuneBetweenStates(currentState, currentState+1)
+
+	m.addTransition(endStarState[0], currentState, translations)
+	return endStarState
+}
+
+func (m *Machine) handleCapture(currentState State, node *syntax.Regexp, isFinal bool) []State {
+	if len(node.Sub) != 1 {
+		panic("Длина node.Sub в захвате не равна 1 -> такой случай я не рассматривал")
+	}
+	return m.handleRegex(node.Sub[0], currentState, isFinal)
+}
+
+func (m *Machine) handleCharClass(currentState State, node *syntax.Regexp, isFinal bool) []State {
+	leftState := m.addState()
+	m.addTransition(currentState, leftState, node.Rune[0])
+
+	rightState := m.addState()
+	m.addTransition(currentState, rightState, node.Rune[1])
+
+	if isFinal {
+		m.addFinal(leftState)
+		m.addFinal(rightState)
+	}
+	return []State{leftState, rightState}
 }
