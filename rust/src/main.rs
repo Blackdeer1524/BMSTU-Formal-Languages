@@ -15,6 +15,6 @@ fn main() {
         }
         let mut parser = Parser::default();
         let parsed_result = parser.parse(buf.as_str());
-        print!("{}", parsed_result.to_string());
+        println!("{}", parsed_result.to_string());
     }
 }
