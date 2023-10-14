@@ -10,6 +10,8 @@
 
 ## Использование
 
+Установить Python и добавить его в PATH
+
 ```sh
 cd rust
 cargo build --release
