@@ -9,12 +9,11 @@ import (
 const (
 	rustBinaryPath = "/Users/slavaruswarrior/Documents/GitHub/BMSTU-Formal-Languages/rust/target/release/lab2"
 	countWords     = 100
-	maxDumpSize    = 200
+	maxDumpSize    = 5000
 )
 
 // TODO: можно сделать красивый логер для всего этого
 // и это было бы приятным дополнением
-// TODO: для увеличения скорости построения слов перейти на strings.Builder
 
 func main() {
 	fmt.Println("start fuzzing")
