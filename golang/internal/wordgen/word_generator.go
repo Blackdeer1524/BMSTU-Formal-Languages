@@ -85,7 +85,8 @@ func GenerateWordsForRegex(regex string, countWords, maxDumpSize int) (*RegexesW
 	org := New(regex, countWords, maxDumpSize, automaton, letterLoop)
 
 	for i := 0; i < countWords; i++ {
-		org.Words[i] = org.DfsBuildWord(automaton, letterLoop)
+		// Добавляю литерал не из языка
+		org.Words[i] = org.DfsBuildWord(automaton, letterLoop) + "Z"
 	}
 
 	return &RegexesWithWords{
