@@ -2,14 +2,12 @@ import re
 import sys
 
 
-def my_python_function(r_pattern):
-    all_is_ok = True
+def regex_tester(r_pattern: re.Pattern) -> bool:
     for line in sys.stdin:
-        word = line.strip()
-        # Слово полностью соответствует регулярному выражению
-        if re.search(f"^{r_pattern}$", word):
-            all_is_ok = False
-    return all_is_ok
+        word = line[:-1]
+        if re.fullmatch(r_pattern, word):
+            return False
+    return True
 
 
 if __name__ == "__main__":
@@ -17,9 +15,10 @@ if __name__ == "__main__":
         print("Не хватает аргументов")
         sys.exit(1)
 
-    pattern = sys.argv[1]
+    raw_pattern = sys.argv[1]
+    pattern = re.compile(raw_pattern)
 
-    all_ok = my_python_function(pattern)
+    all_ok = regex_tester(pattern)
     if all_ok:
         print("OK")
     else:

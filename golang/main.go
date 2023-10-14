@@ -9,7 +9,7 @@ import (
 const (
 	rustBinaryPath = "/Users/slavaruswarrior/Documents/GitHub/BMSTU-Formal-Languages/rust/target/release/lab2"
 	countWords     = 100
-	maxDumpSize    = 2000
+	maxDumpSize    = 200
 )
 
 // TODO: можно сделать красивый логер для всего этого
