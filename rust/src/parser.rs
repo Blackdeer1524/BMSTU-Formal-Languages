@@ -1,4 +1,3 @@
-use std::marker::PhantomData;
 use std::{collections::LinkedList, str::Chars, usize, vec};
 
 use crate::aci::simplify;
@@ -67,7 +66,6 @@ pub struct Parser<'a> {
     index: usize,
     expr_iter: Option<Chars<'a>>,
     next_char: Option<char>,
-    // _parser_lifetime: PhantomData<&'b ()>,
 }
 
 #[derive(Debug, PartialEq, Eq)]
