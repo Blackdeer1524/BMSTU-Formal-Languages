@@ -7,7 +7,7 @@ def my_python_function(r_pattern):
     for line in sys.stdin:
         word = line.strip()
         # Слово полностью соответствует регулярному выражению
-        if re.search(f"^{r_pattern}$", word):
+        if re.fullmatch(r_pattern, word):
             all_is_ok = False
     return all_is_ok
 
