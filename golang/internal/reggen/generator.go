@@ -53,7 +53,6 @@ func NewRGP(
 }
 
 func (r *Regexes) Generate() []string {
-
 	regexes := make([]string, r.CountRegex)
 
 	for i := 0; i < r.CountRegex; i++ {
@@ -64,7 +63,6 @@ func (r *Regexes) Generate() []string {
 }
 
 func (rgp *RegexGeneratorParams) Generate() string {
-
 	regex := rgp.generateRegexRecursive(rgp.letterCount, rgp.alphabetSize)
 
 	if len(regex) == 0 {
@@ -74,8 +72,9 @@ func (rgp *RegexGeneratorParams) Generate() string {
 }
 
 func (rgp *RegexGeneratorParams) generateRegexRecursive(maxLength int, maxStarHeight int) string {
-	if maxLength <= 0 || maxStarHeight <= 0 {
-		return ""
+	if maxLength <= 1 {
+		letter := getLetter(rand.Intn(rgp.alphabetSize))
+		return letter
 	}
 
 	operation := rand.Intn(4)
@@ -90,11 +89,11 @@ func (rgp *RegexGeneratorParams) generateRegexRecursive(maxLength int, maxStarHe
 		right := rgp.generateRegexRecursive(maxLength-1, maxStarHeight)
 		return alternative(left, right)
 	case 2:
-		subExpr := rgp.generateRegexRecursive(maxLength-1, maxStarHeight-1)
-		return starKellie(subExpr)
-	default:
 		letter := getLetter(rand.Intn(rgp.alphabetSize))
 		return letter
+	default:
+		subExpr := rgp.generateRegexRecursive(maxLength-1, maxStarHeight-1)
+		return starKellie(subExpr)
 	}
 }
 
