@@ -25,6 +25,7 @@ func GenerateWordsForRegexes(regexes []string, countWords, maxDumpSize int) ([]R
 	rwws := make([]RegexesWithWords, len(regexes))
 
 	for i := 0; i < len(rwws); i++ {
+		fmt.Println("generate word for regex")
 		rww, err := GenerateWordsForRegex(regexes[i], countWords, maxDumpSize)
 		if err != nil {
 			return nil, err
@@ -84,8 +85,11 @@ func GenerateWordsForRegex(regex string, countWords, maxDumpSize int) (*RegexesW
 
 	org := New(regex, countWords, maxDumpSize, automaton, letterLoop)
 
+	fmt.Println("build automation finished")
+
 	for i := 0; i < countWords; i++ {
-		org.Words[i] = org.DfsBuildWord(automaton, letterLoop)
+		// Добавляю литерал не из языка
+		org.Words[i] = org.DfsBuildWord(automaton, letterLoop) + "Z"
 	}
 
 	return &RegexesWithWords{
