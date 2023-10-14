@@ -8,3 +8,12 @@
 * Слесарев Данила, ИУ9-51Б
 * Вячеслав Локшин, ИУ9-51Б
 
+## Использование
+
+```sh
+cd rust
+cargo build --release
+cd ../golang
+go run main.go
+```
+
