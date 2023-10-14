@@ -3,46 +3,48 @@ package benchmark
 import (
 	"bytes"
 	"fmt"
-	"github.com/VyacheslavIsWorkingNow/tfl/lab2/internal/reggen"
-	"github.com/VyacheslavIsWorkingNow/tfl/lab2/internal/wordgen"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
+
+	"github.com/VyacheslavIsWorkingNow/tfl/lab2/internal/reggen"
+	"github.com/VyacheslavIsWorkingNow/tfl/lab2/internal/wordgen"
 )
 
-const pythonScriptPath = "golang/internal/benchmark/regular_compression.py"
+var (
+	_, b, _, _       = runtime.Caller(0)
+	basepath         = filepath.Dir(b)
+	pythonScriptPath = basepath + "/regular_compression.py"
+)
 
 func Start(reg *reggen.Regexes, rustBinaryPath string, countWords, maxDumpSize int) error {
-
 	regexes := reg.Generate()
 
-	fmt.Println("start generate")
+	fmt.Println("started generating...")
 
 	words, gErr := wordgen.GenerateWordsForRegexes(regexes, countWords, maxDumpSize)
 	if gErr != nil {
 		return fmt.Errorf("failed in bench start generate words %w", gErr)
 	}
 
-	fmt.Println("end generate")
+	fmt.Println("finished generating")
 
 	cErr := conversionRegularExpression(words, rustBinaryPath)
 	if cErr != nil {
-		return fmt.Errorf("failed in bench start conversion %w", cErr)
+		return fmt.Errorf("failed at bench start conversion %w", cErr)
 	}
 
 	pErr := runBenchmarksInPython(words)
 	if pErr != nil {
-		return fmt.Errorf("failed in bench start python comparassion %w", cErr)
+		return fmt.Errorf("failed at bench start python comparassion %w", cErr)
 	}
 	return nil
 }
 
 func conversionRegularExpression(rww []wordgen.RegexesWithWords, rustBinaryPath string) error {
-
-	fmt.Printf("рабочая директория: ")
-	fmt.Println(os.Getwd())
-
 	cmd := exec.Command(rustBinaryPath)
 
 	var stdin, stdout bytes.Buffer
@@ -56,7 +58,7 @@ func conversionRegularExpression(rww []wordgen.RegexesWithWords, rustBinaryPath 
 
 	rErr := cmd.Run()
 	if rErr != nil {
-		return fmt.Errorf("failed to run exec rust binary %w", rErr)
+		return fmt.Errorf("failed to run simplifier: %w", rErr)
 	}
 
 	output := strings.TrimSuffix(stdout.String(), "\n\n")
@@ -71,7 +73,6 @@ func conversionRegularExpression(rww []wordgen.RegexesWithWords, rustBinaryPath 
 }
 
 func runBenchmarksInPython(wordsWithRegexes []wordgen.RegexesWithWords) error {
-
 	for _, wordsWithRegex := range wordsWithRegexes {
 		err := runPythonScriptForPairRegexes(wordsWithRegex)
 		if err != nil {
@@ -83,13 +84,18 @@ func runBenchmarksInPython(wordsWithRegexes []wordgen.RegexesWithWords) error {
 }
 
 func runPythonScriptForPairRegexes(wordsWithRegex wordgen.RegexesWithWords) error {
-
-	durBefore, okBefore, beforeErr := runPythonScriptForOneRegex(wordsWithRegex.RegexBefore, wordsWithRegex.Words)
+	durBefore, okBefore, beforeErr := runPythonScriptForOneRegex(
+		wordsWithRegex.RegexBefore,
+		wordsWithRegex.Words,
+	)
 	if beforeErr != nil {
 		return fmt.Errorf("failed to run before regexp %w", beforeErr)
 	}
 
-	durAfter, okAfter, afterErr := runPythonScriptForOneRegex(wordsWithRegex.RegexAfter, wordsWithRegex.Words)
+	durAfter, okAfter, afterErr := runPythonScriptForOneRegex(
+		wordsWithRegex.RegexAfter,
+		wordsWithRegex.Words,
+	)
 	if afterErr != nil {
 		return fmt.Errorf("failed to run after regexp %w", afterErr)
 	}

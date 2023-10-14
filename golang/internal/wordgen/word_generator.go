@@ -21,11 +21,14 @@ type RegexesWithWords struct {
 	Words       []string
 }
 
-func GenerateWordsForRegexes(regexes []string, countWords, maxDumpSize int) ([]RegexesWithWords, error) {
+func GenerateWordsForRegexes(
+	regexes []string,
+	countWords, maxDumpSize int,
+) ([]RegexesWithWords, error) {
 	rwws := make([]RegexesWithWords, len(regexes))
 
 	for i := 0; i < len(rwws); i++ {
-		fmt.Println("generate word for regex")
+		fmt.Println("generating a word for regex")
 		rww, err := GenerateWordsForRegex(regexes[i], countWords, maxDumpSize)
 		if err != nil {
 			return nil, err
@@ -63,7 +66,7 @@ func New(
 func GenerateWordsForRegex(regex string, countWords, maxDumpSize int) (*RegexesWithWords, error) {
 	tree, pErr := parser.ParseRegex(regex)
 	if pErr != nil {
-		return nil, fmt.Errorf("can't parse regex %w", pErr)
+		return nil, fmt.Errorf("can't parse regex: %w", pErr)
 	}
 
 	automaton := gluskov.BuildMachine(tree)
