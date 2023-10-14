@@ -12,7 +12,27 @@ import (
 
 type ManyRegexpWordGenerator struct {
 	countRegex int
-	rg         []OneRegexpGenerator
+	rg         []RegexesWithWords
+}
+
+type RegexesWithWords struct {
+	RegexBefore string
+	RegexAfter  string
+	Words       []string
+}
+
+func GenerateWordsForRegexes(regexes []string, countWords, maxDumpSize int) ([]RegexesWithWords, error) {
+	rwws := make([]RegexesWithWords, len(regexes))
+
+	for i := 0; i < len(rwws); i++ {
+		rww, err := GenerateWordsForRegex(regexes[i], countWords, maxDumpSize)
+		if err != nil {
+			return nil, err
+		}
+		rwws[i] = *rww
+	}
+
+	return rwws, nil
 }
 
 type OneRegexpGenerator struct {
@@ -39,7 +59,7 @@ func New(
 	}
 }
 
-func GenerateWordsForRegex(regex string, countWords, maxDumpSize int) ([]string, error) {
+func GenerateWordsForRegex(regex string, countWords, maxDumpSize int) (*RegexesWithWords, error) {
 	tree, pErr := parser.ParseRegex(regex)
 	if pErr != nil {
 		return nil, fmt.Errorf("can't parse regex %w", pErr)
@@ -47,15 +67,17 @@ func GenerateWordsForRegex(regex string, countWords, maxDumpSize int) ([]string,
 
 	automaton := gluskov.BuildMachine(tree)
 
-	err := automaton.GetDotMachine()
-	if err != nil {
-		return nil, err
-	}
+	// Визуализация автомата
+	//err := automaton.GetDotMachine()
+	//if err != nil {
+	//	return nil, err
+	//}
 
-	err = parser.ParseRegexInDot(regex)
-	if err != nil {
-		return nil, err
-	}
+	// Визуализация дерева разбора
+	//err = parser.ParseRegexInDot(regex)
+	//if err != nil {
+	//	return nil, err
+	//}
 
 	loops := loop.FindCycles(automaton)
 	letterLoop := loop.TranslateLoops(loops, automaton)
@@ -66,7 +88,10 @@ func GenerateWordsForRegex(regex string, countWords, maxDumpSize int) ([]string,
 		org.Words[i] = org.DfsBuildWord(automaton, letterLoop)
 	}
 
-	return org.Words, nil
+	return &RegexesWithWords{
+		Words:       org.Words,
+		RegexBefore: regex,
+	}, nil
 }
 
 func (org *OneRegexpGenerator) DfsBuildWord(
@@ -99,11 +124,13 @@ func dfs(
 
 	(*visited)[currentState] = true
 
-	randomLetter, randomStates := randomStatesTransition(m.Transitions[currentState])
-	*word += string(randomLetter)
-	for _, nextState := range randomStates {
-		if !(*visited)[nextState] {
-			dfs(m, nextState, loops, visited, word, maxDumpSize)
+	if len(m.Transitions[currentState]) > 0 {
+		randomLetter, randomStates := randomStatesTransition(m.Transitions[currentState])
+		*word += string(randomLetter)
+		for _, nextState := range randomStates {
+			if !(*visited)[nextState] {
+				dfs(m, nextState, loops, visited, word, maxDumpSize)
+			}
 		}
 	}
 }

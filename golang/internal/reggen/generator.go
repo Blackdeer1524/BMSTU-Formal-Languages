@@ -6,12 +6,12 @@ import (
 )
 
 const (
-	maxAlphabetNumber = 52
+	maxAlphabetNumber = 51
 )
 
 type Regexes struct {
 	rgp        RegexGeneratorParams
-	countRegex int
+	CountRegex int
 }
 
 type RegexGeneratorParams struct {
@@ -32,7 +32,7 @@ func New(
 	}
 	return &Regexes{
 		rgp:        *rgp,
-		countRegex: countRegex,
+		CountRegex: countRegex,
 	}, nil
 }
 
@@ -54,9 +54,9 @@ func NewRGP(
 
 func (r *Regexes) Generate() []string {
 
-	regexes := make([]string, r.countRegex)
+	regexes := make([]string, r.CountRegex)
 
-	for i := 0; i < r.countRegex; i++ {
+	for i := 0; i < r.CountRegex; i++ {
 		regexes[i] = r.rgp.Generate()
 	}
 
@@ -67,6 +67,9 @@ func (rgp *RegexGeneratorParams) Generate() string {
 
 	regex := rgp.generateRegexRecursive(rgp.letterCount, rgp.alphabetSize)
 
+	if len(regex) == 0 {
+		return rgp.Generate()
+	}
 	return regex
 }
 
