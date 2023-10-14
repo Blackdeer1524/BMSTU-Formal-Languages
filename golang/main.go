@@ -24,8 +24,8 @@ func main() {
 	flag.StringVar(&simplifier_path, "binpath", "", "regex simplifier binary path")
 	flag.IntVar(&countRegex, "regex-n", 1, "number of regexes")
 	flag.IntVar(&alphabetSize, "alphabet-size", 1, "alphabet size")
-	flag.IntVar(&starHeight, "star-height", 1, "star height")
-	flag.IntVar(&letterCount, "letter-count", 1, "letter count")
+	flag.IntVar(&starHeight, "max-height", 1, "max star height")
+	flag.IntVar(&letterCount, "max-len", 1, "max letter count")
 	flag.Parse()
 
 	if len(os.Args) == 1 {
