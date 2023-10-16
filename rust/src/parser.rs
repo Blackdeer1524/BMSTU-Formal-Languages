@@ -901,6 +901,34 @@ mod tests {
     }
 
     #[test]
+    fn star_in_front() {
+        let expr = "(b*|b*a)";
+        let mut parser = Parser::default();
+
+        let res = parser.parse(expr);
+        let expected = ParsingResult::Concat {
+            args: vec![
+                ConcatArg::Star(Box::new(StarArg::Concat {
+                    args: vec![ConcatArg::Char('b')],
+                    accepts_empty: false,
+                })),
+                ConcatArg::Alt {
+                    args: vec![
+                        AltArg::Concat { args: vec![], accepts_empty: true },
+                        AltArg::Concat {
+                            args: vec![ConcatArg::Char('a')],
+                            accepts_empty: false,
+                        },
+                    ],
+                    accepts_empty: true,
+                },
+            ],
+            accepts_empty: true,
+        };
+        assert_eq!(expected, res);
+    }
+
+    #[test]
     fn concat_with_star_in_alt() {
         let expr = "(a|b*)";
         let mut parser = Parser::default();

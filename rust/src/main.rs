@@ -13,6 +13,7 @@ fn main() {
             }
             Err(err) => panic!("{}", err),
         }
+        buf.pop();
         let mut parser = Parser::default();
         let parsed_result = parser.parse(buf.as_str());
         println!("{}", parsed_result.to_string());
