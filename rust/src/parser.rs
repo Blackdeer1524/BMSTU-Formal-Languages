@@ -12,9 +12,11 @@ pub enum AltArg {
 impl ToString for AltArg {
     fn to_string(&self) -> String {
         match self {
-            AltArg::Concat { args, accepts_empty } => {
-                args.iter().map(|item| item.to_string()).collect::<Vec<String>>().join("")
-            }
+            AltArg::Concat { args, accepts_empty } => args
+                .iter()
+                .map(|item| item.to_string())
+                .collect::<Vec<String>>()
+                .join(""),
             AltArg::Star(arg) => format!("({})*", arg.to_string()),
         }
     }
@@ -33,7 +35,10 @@ impl ToString for ConcatArg {
             ConcatArg::Alt { args, accepts_empty } => {
                 format!(
                     "({})",
-                    args.iter().map(|item| { item.to_string() }).collect::<Vec<String>>().join("|")
+                    args.iter()
+                        .map(|item| { item.to_string() })
+                        .collect::<Vec<String>>()
+                        .join("|")
                 )
             }
             ConcatArg::Star(arg) => format!("({})*", arg.to_string()),
@@ -51,12 +56,16 @@ pub enum StarArg {
 impl ToString for StarArg {
     fn to_string(&self) -> String {
         match self {
-            StarArg::Concat { args, accepts_empty } => {
-                args.iter().map(|item| item.to_string()).collect::<Vec<String>>().join("")
-            }
-            StarArg::Alt { args, accepts_empty } => {
-                args.iter().map(|item| item.to_string()).collect::<Vec<String>>().join("|")
-            }
+            StarArg::Concat { args, accepts_empty } => args
+                .iter()
+                .map(|item| item.to_string())
+                .collect::<Vec<String>>()
+                .join(""),
+            StarArg::Alt { args, accepts_empty } => args
+                .iter()
+                .map(|item| item.to_string())
+                .collect::<Vec<String>>()
+                .join("|"),
         }
     }
 }
@@ -81,12 +90,17 @@ impl ToString for ParsingResult {
             ParsingResult::Alt { args, accepts_empty: _ } => {
                 format!(
                     "({})",
-                    args.iter().map(|item| { item.to_string() }).collect::<Vec<String>>().join("|")
+                    args.iter()
+                        .map(|item| { item.to_string() })
+                        .collect::<Vec<String>>()
+                        .join("|")
                 )
             }
-            ParsingResult::Concat { args, accepts_empty: _ } => {
-                args.iter().map(|item| item.to_string()).collect::<Vec<String>>().join("")
-            }
+            ParsingResult::Concat { args, accepts_empty: _ } => args
+                .iter()
+                .map(|item| item.to_string())
+                .collect::<Vec<String>>()
+                .join(""),
             ParsingResult::Star(arg) => format!("({})*", arg.to_string()),
         }
     }
@@ -95,7 +109,9 @@ impl ToString for ParsingResult {
 impl From<AltArg> for ParsingResult {
     fn from(value: AltArg) -> Self {
         match value {
-            AltArg::Concat { args, accepts_empty } => ParsingResult::Concat { args, accepts_empty },
+            AltArg::Concat { args, accepts_empty } => {
+                ParsingResult::Concat { args, accepts_empty }
+            }
             AltArg::Star(arg) => ParsingResult::Star(arg),
         }
     }
@@ -104,13 +120,15 @@ impl From<AltArg> for ParsingResult {
 impl From<ConcatArg> for ParsingResult {
     fn from(value: ConcatArg) -> Self {
         match value {
-            ConcatArg::Alt { args, accepts_empty } => {
-                ParsingResult::Alt { args: LinkedList::from_iter(args), accepts_empty }
-            }
+            ConcatArg::Alt { args, accepts_empty } => ParsingResult::Alt {
+                args: LinkedList::from_iter(args),
+                accepts_empty,
+            },
             ConcatArg::Star(arg) => ParsingResult::Star(arg),
-            ConcatArg::Char(c) => {
-                ParsingResult::Concat { args: vec![ConcatArg::Char(c)], accepts_empty: false }
-            }
+            ConcatArg::Char(c) => ParsingResult::Concat {
+                args: vec![ConcatArg::Char(c)],
+                accepts_empty: false,
+            },
         }
     }
 }
@@ -118,9 +136,10 @@ impl From<ConcatArg> for ParsingResult {
 impl From<StarArg> for ParsingResult {
     fn from(value: StarArg) -> Self {
         match value {
-            StarArg::Alt { args, accepts_empty } => {
-                ParsingResult::Alt { args: LinkedList::from_iter(args), accepts_empty }
-            }
+            StarArg::Alt { args, accepts_empty } => ParsingResult::Alt {
+                args: LinkedList::from_iter(args),
+                accepts_empty,
+            },
             StarArg::Concat { args, accepts_empty } => {
                 ParsingResult::Concat { args, accepts_empty }
             }
@@ -148,7 +167,9 @@ impl From<ParsingResult> for AltArg {
             ParsingResult::Alt { args, accepts_empty } => {
                 unreachable!("alternative cannot have alternative as a child")
             }
-            ParsingResult::Concat { args, accepts_empty } => AltArg::Concat { args, accepts_empty },
+            ParsingResult::Concat { args, accepts_empty } => {
+                AltArg::Concat { args, accepts_empty }
+            }
             ParsingResult::Star(arg) => AltArg::Star(arg),
         }
     }
@@ -184,19 +205,20 @@ impl<'a> Parser<'a> {
 
     fn expect_alternative(&mut self) -> ParsingResult {
         let mut alt_args: Vec<AltArg> = vec![];
-        let mut alt_accepts_empty = true;
+        let mut alt_accepts_empty = false;
         loop {
             let x = self.expect_unary();
             match x {
                 ParsingResult::Alt { args, accepts_empty } => {
-                    alt_accepts_empty &= accepts_empty;
+                    alt_accepts_empty |= accepts_empty;
                     alt_args.extend(args);
                 }
                 ParsingResult::Concat { args, accepts_empty } => {
-                    alt_accepts_empty &= accepts_empty;
+                    alt_accepts_empty |= accepts_empty;
                     alt_args.push(AltArg::Concat { args, accepts_empty });
                 }
                 ParsingResult::Star(arg) => {
+                    alt_accepts_empty = true;
                     alt_args.push(AltArg::Star(arg));
                 }
             }
@@ -287,14 +309,17 @@ impl<'a> Parser<'a> {
 
             match last_concat {
                 ParsingResult::Alt { args, accepts_empty } => {
-                    unary_concat_args.push(ConcatArg::Star(Box::new(StarArg::Alt {
-                        args: Vec::from_iter(args),
-                        accepts_empty,
-                    })));
+                    unary_concat_args.push(ConcatArg::Star(Box::new(
+                        StarArg::Alt {
+                            args: Vec::from_iter(args),
+                            accepts_empty,
+                        },
+                    )));
                 }
                 ParsingResult::Concat { args, accepts_empty } => {
-                    unary_concat_args
-                        .push(ConcatArg::Star(Box::new(StarArg::Concat { args, accepts_empty })));
+                    unary_concat_args.push(ConcatArg::Star(Box::new(
+                        StarArg::Concat { args, accepts_empty },
+                    )));
                 }
                 ParsingResult::Star(arg) => {
                     unary_concat_args.push(ConcatArg::Star(arg));
@@ -305,7 +330,10 @@ impl<'a> Parser<'a> {
             let last = unary_concat_args.pop().unwrap();
             match last {
                 ConcatArg::Alt { args, accepts_empty } => {
-                    return ParsingResult::Alt { args: LinkedList::from_iter(args), accepts_empty };
+                    return ParsingResult::Alt {
+                        args: LinkedList::from_iter(args),
+                        accepts_empty,
+                    };
                 }
                 ConcatArg::Star(arg) => {
                     return ParsingResult::Star(arg);
@@ -318,12 +346,19 @@ impl<'a> Parser<'a> {
                 }
             }
         }
-        ParsingResult::Concat { args: unary_concat_args, accepts_empty: unary_concat_accepts_empty }
+        ParsingResult::Concat {
+            args: unary_concat_args,
+            accepts_empty: unary_concat_accepts_empty,
+        }
     }
 
     fn peek(&mut self) -> Option<char> {
         if self.next_char.is_none() {
-            self.next_char = self.expr_iter.as_mut().expect("expected initialized iterator").next();
+            self.next_char = self
+                .expr_iter
+                .as_mut()
+                .expect("expected initialized iterator")
+                .next();
             if self.next_char.is_some() {
                 self.index += 1;
             }
@@ -336,7 +371,10 @@ impl<'a> Parser<'a> {
             self.next_char = None;
         } else {
             self.index += 1;
-            self.expr_iter.as_mut().expect("expected initialized iterator").next();
+            self.expr_iter
+                .as_mut()
+                .expect("expected initialized iterator")
+                .next();
         }
     }
 
@@ -349,10 +387,15 @@ impl<'a> Parser<'a> {
             if next == expected {
                 self.advance();
             } else {
-                self.report(format!("expected '{}', but '{}' found", expected, next).as_str())
+                self.report(
+                    format!("expected '{}', but '{}' found", expected, next)
+                        .as_str(),
+                )
             }
         } else {
-            self.report(format!("expected '{}', but 'EOF' found", expected).as_str())
+            self.report(
+                format!("expected '{}', but 'EOF' found", expected).as_str(),
+            )
         }
     }
 
@@ -384,7 +427,8 @@ mod tests {
         let mut parser = Parser::default();
 
         let res = parser.parse(expr);
-        let expected = ParsingResult::Concat { args: vec![], accepts_empty: true };
+        let expected =
+            ParsingResult::Concat { args: vec![], accepts_empty: true };
         assert_eq!(expected, res);
     }
 
@@ -395,7 +439,11 @@ mod tests {
 
         let res = parser.parse(expr);
         let expected = ParsingResult::Concat {
-            args: vec![ConcatArg::Char('a'), ConcatArg::Char('b'), ConcatArg::Char('c')],
+            args: vec![
+                ConcatArg::Char('a'),
+                ConcatArg::Char('b'),
+                ConcatArg::Char('c'),
+            ],
             accepts_empty: false,
         };
         assert_eq!(expected, res);
@@ -411,11 +459,19 @@ mod tests {
         let expected = ParsingResult::Alt {
             args: LinkedList::from([
                 AltArg::Concat {
-                    args: vec![ConcatArg::Char('a'), ConcatArg::Char('b'), ConcatArg::Char('c')],
+                    args: vec![
+                        ConcatArg::Char('a'),
+                        ConcatArg::Char('b'),
+                        ConcatArg::Char('c'),
+                    ],
                     accepts_empty: false,
                 },
                 AltArg::Concat {
-                    args: vec![ConcatArg::Char('c'), ConcatArg::Char('d'), ConcatArg::Char('e')],
+                    args: vec![
+                        ConcatArg::Char('c'),
+                        ConcatArg::Char('d'),
+                        ConcatArg::Char('e'),
+                    ],
                     accepts_empty: false,
                 },
             ]),
@@ -451,7 +507,11 @@ mod tests {
 
         let res = parser.parse(expr);
         let expected = ParsingResult::Star(Box::new(StarArg::Concat {
-            args: vec![ConcatArg::Char('a'), ConcatArg::Char('b'), ConcatArg::Char('c')],
+            args: vec![
+                ConcatArg::Char('a'),
+                ConcatArg::Char('b'),
+                ConcatArg::Char('c'),
+            ],
             accepts_empty: false,
         }));
 
@@ -461,7 +521,6 @@ mod tests {
     #[test]
     fn empty_alternative_under_star() {
         let expr = "(a*b|b)*";
-        // (a*b|b)* = ((eps|a*)b)*
         let mut parser = Parser::default();
         let res = parser.parse(expr);
         let expected = ParsingResult::Star(Box::new(StarArg::Concat {
@@ -492,7 +551,11 @@ mod tests {
         let expected = ParsingResult::Concat {
             args: vec![
                 ConcatArg::Star(Box::new(StarArg::Concat {
-                    args: vec![ConcatArg::Char('a'), ConcatArg::Char('b'), ConcatArg::Char('c')],
+                    args: vec![
+                        ConcatArg::Char('a'),
+                        ConcatArg::Char('b'),
+                        ConcatArg::Char('c'),
+                    ],
                     accepts_empty: false,
                 })),
                 ConcatArg::Char('c'),
@@ -533,7 +596,11 @@ mod tests {
         let res = parser.parse(expr);
 
         let expected = ParsingResult::Star(Box::new(StarArg::Concat {
-            args: vec![ConcatArg::Char('a'), ConcatArg::Char('b'), ConcatArg::Char('c')],
+            args: vec![
+                ConcatArg::Char('a'),
+                ConcatArg::Char('b'),
+                ConcatArg::Char('c'),
+            ],
             accepts_empty: false,
         }));
 
@@ -571,11 +638,19 @@ mod tests {
         let expected = ParsingResult::Concat {
             args: vec![
                 ConcatArg::Star(Box::new(StarArg::Concat {
-                    args: vec![ConcatArg::Char('a'), ConcatArg::Char('b'), ConcatArg::Char('c')],
+                    args: vec![
+                        ConcatArg::Char('a'),
+                        ConcatArg::Char('b'),
+                        ConcatArg::Char('c'),
+                    ],
                     accepts_empty: false,
                 })),
                 ConcatArg::Star(Box::new(StarArg::Concat {
-                    args: vec![ConcatArg::Char('c'), ConcatArg::Char('d'), ConcatArg::Char('e')],
+                    args: vec![
+                        ConcatArg::Char('c'),
+                        ConcatArg::Char('d'),
+                        ConcatArg::Char('e'),
+                    ],
                     accepts_empty: false,
                 })),
             ],
@@ -593,10 +668,22 @@ mod tests {
         let res = parser.parse(expr);
         let expected = ParsingResult::Alt {
             args: LinkedList::from([
-                AltArg::Concat { args: vec![ConcatArg::Char('a')], accepts_empty: false },
-                AltArg::Concat { args: vec![ConcatArg::Char('b')], accepts_empty: false },
-                AltArg::Concat { args: vec![ConcatArg::Char('c')], accepts_empty: false },
-                AltArg::Concat { args: vec![ConcatArg::Char('d')], accepts_empty: false },
+                AltArg::Concat {
+                    args: vec![ConcatArg::Char('a')],
+                    accepts_empty: false,
+                },
+                AltArg::Concat {
+                    args: vec![ConcatArg::Char('b')],
+                    accepts_empty: false,
+                },
+                AltArg::Concat {
+                    args: vec![ConcatArg::Char('c')],
+                    accepts_empty: false,
+                },
+                AltArg::Concat {
+                    args: vec![ConcatArg::Char('d')],
+                    accepts_empty: false,
+                },
             ]),
             accepts_empty: false,
         };
@@ -670,11 +757,15 @@ mod tests {
                     accepts_empty: true,
                 },
                 AltArg::Concat {
-                    args: vec![ConcatArg::Char('q'), ConcatArg::Char('r'), ConcatArg::Char('p')],
+                    args: vec![
+                        ConcatArg::Char('q'),
+                        ConcatArg::Char('r'),
+                        ConcatArg::Char('p'),
+                    ],
                     accepts_empty: false,
                 },
             ]),
-            accepts_empty: false,
+            accepts_empty: true,
         };
 
         assert_eq!(expected, res);
@@ -689,11 +780,19 @@ mod tests {
         let expected = ParsingResult::Star(Box::new(StarArg::Alt {
             args: vec![
                 AltArg::Concat {
-                    args: vec![ConcatArg::Char('a'), ConcatArg::Char('b'), ConcatArg::Char('c')],
+                    args: vec![
+                        ConcatArg::Char('a'),
+                        ConcatArg::Char('b'),
+                        ConcatArg::Char('c'),
+                    ],
                     accepts_empty: false,
                 },
                 AltArg::Concat {
-                    args: vec![ConcatArg::Char('c'), ConcatArg::Char('d'), ConcatArg::Char('e')],
+                    args: vec![
+                        ConcatArg::Char('c'),
+                        ConcatArg::Char('d'),
+                        ConcatArg::Char('e'),
+                    ],
                     accepts_empty: false,
                 },
             ],
@@ -714,8 +813,14 @@ mod tests {
                 ConcatArg::Alt {
                     args: vec![
                         AltArg::Concat { args: vec![], accepts_empty: true },
-                        AltArg::Concat { args: vec![ConcatArg::Char('q')], accepts_empty: false },
-                        AltArg::Concat { args: vec![ConcatArg::Char('r')], accepts_empty: false },
+                        AltArg::Concat {
+                            args: vec![ConcatArg::Char('q')],
+                            accepts_empty: false,
+                        },
+                        AltArg::Concat {
+                            args: vec![ConcatArg::Char('r')],
+                            accepts_empty: false,
+                        },
                     ],
                     accepts_empty: true,
                 },
@@ -744,13 +849,16 @@ mod tests {
         let expr = "(a|a)";
         let mut parser = Parser::default();
         let res = parser.parse(expr);
-        let expected =
-            ParsingResult::Concat { args: vec![ConcatArg::Char('a')], accepts_empty: false };
+        let expected = ParsingResult::Concat {
+            args: vec![ConcatArg::Char('a')],
+            accepts_empty: false,
+        };
         assert_eq!(expected, res);
     }
 
     #[test]
     fn hard_simplification() {
+        // HERE
         let expr = "(a)*r(c|d)|a*q(d|c)";
         let mut parser = Parser::default();
         let res = parser.parse(expr);
@@ -762,20 +870,82 @@ mod tests {
                 })),
                 ConcatArg::Alt {
                     args: vec![
-                        AltArg::Concat { args: vec![ConcatArg::Char('q')], accepts_empty: false },
-                        AltArg::Concat { args: vec![ConcatArg::Char('r')], accepts_empty: false },
+                        AltArg::Concat {
+                            args: vec![ConcatArg::Char('q')],
+                            accepts_empty: false,
+                        },
+                        AltArg::Concat {
+                            args: vec![ConcatArg::Char('r')],
+                            accepts_empty: false,
+                        },
                     ],
                     accepts_empty: false,
                 },
                 ConcatArg::Alt {
                     args: vec![
-                        AltArg::Concat { args: vec![ConcatArg::Char('c')], accepts_empty: false },
-                        AltArg::Concat { args: vec![ConcatArg::Char('d')], accepts_empty: false },
+                        AltArg::Concat {
+                            args: vec![ConcatArg::Char('c')],
+                            accepts_empty: false,
+                        },
+                        AltArg::Concat {
+                            args: vec![ConcatArg::Char('d')],
+                            accepts_empty: false,
+                        },
                     ],
                     accepts_empty: false,
                 },
             ],
             accepts_empty: false,
+        };
+        assert_eq!(expected, res);
+    }
+
+    #[test]
+    fn star_in_front() {
+        let expr = "(b*|b*a)";
+        let mut parser = Parser::default();
+
+        let res = parser.parse(expr);
+        let expected = ParsingResult::Concat {
+            args: vec![
+                ConcatArg::Star(Box::new(StarArg::Concat {
+                    args: vec![ConcatArg::Char('b')],
+                    accepts_empty: false,
+                })),
+                ConcatArg::Alt {
+                    args: vec![
+                        AltArg::Concat { args: vec![], accepts_empty: true },
+                        AltArg::Concat {
+                            args: vec![ConcatArg::Char('a')],
+                            accepts_empty: false,
+                        },
+                    ],
+                    accepts_empty: true,
+                },
+            ],
+            accepts_empty: true,
+        };
+        assert_eq!(expected, res);
+    }
+
+    #[test]
+    fn concat_with_star_in_alt() {
+        let expr = "(a|b*)";
+        let mut parser = Parser::default();
+
+        let res = parser.parse(expr);
+        let expected = ParsingResult::Alt {
+            args: LinkedList::from([
+                AltArg::Star(Box::new(StarArg::Concat {
+                    args: vec![ConcatArg::Char('b')],
+                    accepts_empty: false,
+                })),
+                AltArg::Concat {
+                    args: vec![ConcatArg::Char('a')],
+                    accepts_empty: false,
+                },
+            ]),
+            accepts_empty: true,
         };
         assert_eq!(expected, res);
     }
@@ -814,7 +984,11 @@ mod tests {
                     accepts_empty: false,
                 })),
                 ConcatArg::Star(Box::new(StarArg::Concat {
-                    args: vec![ConcatArg::Char('a'), ConcatArg::Char('b'), ConcatArg::Char('c')],
+                    args: vec![
+                        ConcatArg::Char('a'),
+                        ConcatArg::Char('b'),
+                        ConcatArg::Char('c'),
+                    ],
                     accepts_empty: false,
                 })),
             ],
