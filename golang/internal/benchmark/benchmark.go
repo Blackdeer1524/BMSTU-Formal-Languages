@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"time"
@@ -20,28 +21,74 @@ var (
 	pythonScriptPath = basepath + "/regular_compression.py"
 )
 
+func EquivalenceCheck(reg *reggen.Regexes, rustBinaryPath string, countWords, maxDumpSize int) error {
+	words, err := prepareEnvironment(reg, rustBinaryPath, countWords, maxDumpSize)
+	if err != nil {
+		return err
+	}
+
+	compareRegexWithWords(words)
+
+	return nil
+}
+
+func compareRegexWithWords(rwws []wordgen.RegexesWithWords) {
+
+	for _, rww := range rwws {
+		fmt.Printf("compare expected: %s regular with actual: %s\n", rww.RegexBefore, rww.RegexAfter)
+		runWords(rww)
+	}
+}
+
+func runWords(rww wordgen.RegexesWithWords) {
+	for _, word := range rww.Words {
+		if !equalMatched(rww.RegexBefore, rww.RegexAfter, word) {
+			fmt.Printf("Don`t equal in word: %s\n", word)
+		} else {
+			fmt.Printf("OK in: %s\n", word)
+		}
+	}
+}
+
+func equalMatched(p1, p2, word string) bool {
+	beforeMatched, _ := regexp.MatchString(p1, word)
+	afterMatched, _ := regexp.MatchString(p2, word)
+	return beforeMatched == afterMatched
+}
+
 func Start(reg *reggen.Regexes, rustBinaryPath string, countWords, maxDumpSize int) error {
+
+	words, err := prepareEnvironment(reg, rustBinaryPath, countWords, maxDumpSize)
+	if err != nil {
+		return err
+	}
+
+	pErr := runBenchmarksInPython(words)
+	if pErr != nil {
+		return fmt.Errorf("failed at bench start python comparassion %w", pErr)
+	}
+	return nil
+}
+
+func prepareEnvironment(
+	reg *reggen.Regexes, rustBinaryPath string, countWords, maxDumpSize int,
+) ([]wordgen.RegexesWithWords, error) {
+
 	regexes := reg.Generate()
 
 	fmt.Println("started generating...")
 
 	words, gErr := wordgen.GenerateWordsForRegexes(regexes, countWords, maxDumpSize)
 	if gErr != nil {
-		return fmt.Errorf("failed in bench start generate words %w", gErr)
+		return nil, fmt.Errorf("failed in bench start generate words %w", gErr)
 	}
-
-	fmt.Println("finished generating")
 
 	cErr := conversionRegularExpression(words, rustBinaryPath)
 	if cErr != nil {
-		return fmt.Errorf("failed at bench start conversion %w", cErr)
+		return nil, fmt.Errorf("failed at bench start conversion %w", cErr)
 	}
 
-	pErr := runBenchmarksInPython(words)
-	if pErr != nil {
-		return fmt.Errorf("failed at bench start python comparassion %w", cErr)
-	}
-	return nil
+	return words, nil
 }
 
 func conversionRegularExpression(rww []wordgen.RegexesWithWords, rustBinaryPath string) error {
@@ -61,9 +108,8 @@ func conversionRegularExpression(rww []wordgen.RegexesWithWords, rustBinaryPath 
 		return fmt.Errorf("failed to run simplifier: %w", rErr)
 	}
 
-	output := strings.TrimSuffix(stdout.String(), "\n\n")
-
-	outputStrings := strings.Split(output, "\n\n")
+	output := strings.TrimSuffix(stdout.String(), "\n")
+	outputStrings := strings.Split(output, "\n")
 
 	for i, newRegex := range outputStrings {
 		rww[i].RegexAfter = newRegex

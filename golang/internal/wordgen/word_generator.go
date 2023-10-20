@@ -106,11 +106,11 @@ func (org *OneRegexpGenerator) DfsBuildWord(
 	loops loop.StateLoopToString,
 ) string {
 	visited := make(map[gluskov.State]bool)
-	word := ""
+	word := strings.Builder{}
 
 	dfs(*machine, gluskov.State(0), loops, &visited, &word, org.MaxDumpSize)
 
-	return word
+	return word.String()
 }
 
 func dfs(
@@ -118,7 +118,7 @@ func dfs(
 	currentState gluskov.State,
 	loops loop.StateLoopToString,
 	visited *map[gluskov.State]bool,
-	word *string,
+	word *strings.Builder,
 	maxDumpSize int,
 ) {
 	if l, ok := loops[currentState]; ok {
@@ -133,7 +133,7 @@ func dfs(
 
 	if len(m.Transitions[currentState]) > 0 {
 		randomLetter, randomStates := randomStatesTransition(m.Transitions[currentState])
-		*word += string(randomLetter)
+		(*word).WriteRune(randomLetter)
 		for _, nextState := range randomStates {
 			if !(*visited)[nextState] {
 				dfs(m, nextState, loops, visited, word, maxDumpSize)
@@ -164,8 +164,8 @@ func randomStatesTransition(st gluskov.StateTransitions) (rune, []gluskov.State)
 	// Оставлю это как историю
 }
 
-func dumpWord(word *string, pumping string, maxPumpingCount int) int {
+func dumpWord(word *strings.Builder, pumping string, maxPumpingCount int) int {
 	pumpingCount := rand.Intn(maxPumpingCount)
-	*word += strings.Repeat(pumping, pumpingCount)
+	(*word).WriteString(strings.Repeat(pumping, pumpingCount))
 	return pumpingCount
 }
