@@ -39,6 +39,23 @@ func GenerateWordsForRegexes(
 	return rwws, nil
 }
 
+func GenerateWordsForBenchmarkRegexes(
+	rwws []RegexesWithWords,
+) ([]RegexesWithWords, error) {
+
+	addZtoAndWords(&rwws)
+
+	return rwws, nil
+}
+
+func addZtoAndWords(rwws *[]RegexesWithWords) {
+	for i := 0; i < len(*rwws); i++ {
+		for j := 0; j < len((*rwws)[i].Words); j++ {
+			(*rwws)[i].Words[j] += "Z"
+		}
+	}
+}
+
 type OneRegexpGenerator struct {
 	Regex       string
 	CountWord   int
@@ -69,7 +86,7 @@ func GenerateWordsForRegex(regex string, countWords, maxDumpSize int) (*RegexesW
 		return nil, fmt.Errorf("can't parse regex: %w", pErr)
 	}
 
-	automaton := gluskov.BuildMachine(tree)
+	automaton := gluskov.BuildMachine(tree, regex)
 
 	// Визуализация автомата
 	//err := automaton.GetDotMachine()
@@ -92,7 +109,7 @@ func GenerateWordsForRegex(regex string, countWords, maxDumpSize int) (*RegexesW
 
 	for i := 0; i < countWords; i++ {
 		// Добавляю литерал не из языка
-		org.Words[i] = org.DfsBuildWord(automaton, letterLoop) + "Z"
+		org.Words[i] = org.DfsBuildWord(automaton, letterLoop)
 	}
 
 	return &RegexesWithWords{

@@ -2,6 +2,7 @@ package gluskov
 
 import (
 	"fmt"
+	"regexp"
 	"regexp/syntax"
 	"strconv"
 	"strings"
@@ -12,20 +13,22 @@ type StateTransitions map[rune][]State
 
 type Machine struct {
 	StartState   int
-	FinalStates  []State
+	FinalStates  map[State]struct{}
 	Transitions  map[State]StateTransitions
 	StateCounter int
 }
 
-func BuildMachine(st *syntax.Regexp) *Machine {
+func BuildMachine(st *syntax.Regexp, regex string) *Machine {
 	machine := &Machine{
 		StartState:   0,
-		FinalStates:  make([]State, 0),
+		FinalStates:  make(map[State]struct{}),
 		Transitions:  make(map[State]StateTransitions),
 		StateCounter: 1,
 	}
 
 	machine.handleRegex(st, State(machine.StartState), true)
+
+	machine.findAllFinalStates("^" + regex + "$")
 
 	return machine
 }
@@ -35,7 +38,7 @@ func (m *Machine) handleRegex(node *syntax.Regexp, currentState State, isFinal b
 	case syntax.OpLiteral:
 		return m.handleLiteral(currentState, node, isFinal)
 	case syntax.OpConcat:
-		return m.handleConcat(currentState, node, isFinal)
+		return m.handleConcatMulti(currentState, node, isFinal)
 	case syntax.OpAlternate:
 		return m.handleAlternate(currentState, node, isFinal)
 	case syntax.OpStar:
@@ -63,7 +66,7 @@ func (m *Machine) addState() State {
 }
 
 func (m *Machine) addFinal(s State) {
-	m.FinalStates = append(m.FinalStates, s)
+	m.FinalStates[s] = struct{}{}
 }
 
 func (m *Machine) GetRuneBetweenStates(left, right State) (rune, State) {
@@ -103,13 +106,23 @@ func (m *Machine) handleAlternate(currentState State, node *syntax.Regexp, isFin
 	return []State{leftState[0], rightState[0]}
 }
 
-func (m *Machine) handleConcat(currentState State, node *syntax.Regexp, isFinal bool) []State {
+func (m *Machine) handleConcatMulti(currentState State, node *syntax.Regexp, isFinal bool) []State {
 
-	leftState := m.handleRegex(node.Sub[0], currentState, false)
+	beforeState := m.handleRegex(node.Sub[0], currentState, false)
 
+	nextState := make([]State, 0)
+	for i := 1; i < len(node.Sub); i++ {
+		nextState = m.concatRange(beforeState, node.Sub[i], isFinal)
+		beforeState = nextState
+	}
+
+	return nextState
+}
+
+func (m *Machine) concatRange(leftState []State, node *syntax.Regexp, isFinal bool) []State {
 	currentTransitionsBefore := getNewStateTransitionsObject(m.Transitions[leftState[0]])
 
-	rightState := m.handleRegex(node.Sub[1], leftState[0], isFinal)
+	rightState := m.handleRegex(node, leftState[0], isFinal)
 	currentTransitionsAfter := getNewStateTransitionsObject(m.Transitions[leftState[0]])
 
 	newTransitions, err := getLetterTransitionAndNextState(currentTransitionsBefore, currentTransitionsAfter)
@@ -266,4 +279,63 @@ func (m *Machine) handleCharClass(currentState State, node *syntax.Regexp, isFin
 		m.addFinal(rightState)
 	}
 	return []State{leftState, rightState}
+}
+
+type finalStateWord struct {
+	word  string
+	state State
+}
+
+func (m *Machine) generateAllWords() []finalStateWord {
+	words := make([]finalStateWord, 0)
+	visited := make(map[State]bool)
+	m.generateWordsFromState(State(m.StartState), "", visited, &words)
+	return words
+}
+
+func (m *Machine) generateWordsFromState(
+	currentState State,
+	currentWord string,
+	visited map[State]bool,
+	words *[]finalStateWord,
+) {
+	visited[currentState] = true
+
+	*words = append(*words, finalStateWord{currentWord, currentState})
+
+	transitions := m.Transitions[currentState]
+
+	for symbol, nextStates := range transitions {
+		for _, nextState := range nextStates {
+			nextWord := currentWord + string(symbol)
+
+			if !visited[nextState] {
+				m.generateWordsFromState(nextState, nextWord, visited, words)
+			}
+		}
+	}
+
+	visited[currentState] = false
+}
+
+func (m *Machine) findAllFinalStates(regex string) {
+	wordsWithStates := m.generateAllWords()
+
+	for _, ww := range wordsWithStates {
+		m.finalStateCheck(regex, ww)
+	}
+}
+
+func (m *Machine) finalStateCheck(regex string, fsw finalStateWord) {
+	if checkWordInRegex(regex, fsw.word) {
+		m.addFinal(fsw.state)
+	}
+}
+
+func checkWordInRegex(regex string, word string) bool {
+	ok, err := regexp.MatchString(regex, word)
+	if err != nil {
+		fmt.Println("error in match final state", err)
+	}
+	return ok
 }

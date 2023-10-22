@@ -42,7 +42,7 @@ func compareRegexWithWords(rwws []wordgen.RegexesWithWords) {
 
 func runWords(rww wordgen.RegexesWithWords) {
 	for _, word := range rww.Words {
-		if !equalMatched(rww.RegexBefore, rww.RegexAfter, word) {
+		if !equalMatched("^"+rww.RegexBefore+"$", "^"+rww.RegexAfter+"$", word) {
 			fmt.Printf("Don`t equal in word: %s\n", word)
 		} else {
 			fmt.Printf("OK in: %s\n", word)
@@ -63,6 +63,11 @@ func Start(reg *reggen.Regexes, rustBinaryPath string, countWords, maxDumpSize i
 		return err
 	}
 
+	words, err = wordgen.GenerateWordsForBenchmarkRegexes(words)
+	if err != nil {
+		return err
+	}
+
 	pErr := runBenchmarksInPython(words)
 	if pErr != nil {
 		return fmt.Errorf("failed at bench start python comparassion %w", pErr)
@@ -77,6 +82,8 @@ func prepareEnvironment(
 	regexes := reg.Generate()
 
 	fmt.Println("started generating...")
+
+	fmt.Println("regexes", regexes)
 
 	words, gErr := wordgen.GenerateWordsForRegexes(regexes, countWords, maxDumpSize)
 	if gErr != nil {
