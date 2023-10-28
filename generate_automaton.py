@@ -18,6 +18,9 @@ class State(Enum):
                 return "TERMINATES"
         raise NotImplementedError(f"{self.value}")
 
+NONTERMINALS_T = Literal["A", "B", "S"]
+NONTERMINALS = ["S"]
+TERMINALS = ["a", "Ɛ"]
 
 @dataclass(frozen=True, repr=False)
 class TerminationData:
@@ -53,11 +56,6 @@ VISITED = {
     for flag in [True, False]
     for s in (State.HAS_TO_TERMINATE, State.NOT_SEEN, State.TERMINATES)
 }
-
-
-NONTERMINALS_T = Literal["A", "B", "S"]
-NONTERMINALS = ["S"]
-TERMINALS = ["a", "Ɛ"]
 
 
 def visit_after_arrow(after_arrow_state: TerminationData):
