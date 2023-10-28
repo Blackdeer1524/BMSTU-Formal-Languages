@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Literal
+from typing import Literal, Optional
 
 
 class State(Enum):
@@ -18,24 +18,36 @@ class State(Enum):
                 return "TERMINATES"
         raise NotImplementedError(f"{self.value}")
 
+
 NONTERMINALS_T = Literal["A", "B", "S"]
-NONTERMINALS = ["S"]
-TERMINALS = ["a", "Ɛ"]
+NONTERMINALS = ["S", "A", "B"]
+TERMINALS = ["a", "b", "Ɛ"]
+
 
 @dataclass(frozen=True, repr=False)
 class TerminationData:
-    after_arrow: bool
+    rule_parent: Optional[NONTERMINALS_T] = None
 
     S: State = field(default=State.NOT_SEEN)
+    A: State = field(default=State.NOT_SEEN)
+    B: State = field(default=State.NOT_SEEN)
 
     def is_final(self) -> bool:
-        return self.S == State.TERMINATES and not self.after_arrow
+        return (
+            self.S == State.TERMINATES
+            and self.rule_parent is None
+            and self.A != State.HAS_TO_TERMINATE
+            and self.B != State.HAS_TO_TERMINATE
+        )
 
     def __repr__(self) -> str:
         res = ""
-        if not self.after_arrow:
+        if self.rule_parent is None:
             res = "[START]\n"
-        res += f"S: {self.S}"
+        else:
+            res = f"[{self.rule_parent}->]\n"
+
+        res += f"S: {self.S}\nA: {self.A}\nB: {self.B}"
         return res
 
 
@@ -46,15 +58,19 @@ class Edge:
 
 
 TRANSITIONS: dict[TerminationData, set[Edge]] = {
-    TerminationData(S=s, after_arrow=flag): set()
-    for flag in [True, False]
+    TerminationData(S=s, A=a, B=b, rule_parent=parent): set()  # type: ignore
+    for parent in NONTERMINALS + [None]
     for s in (State.HAS_TO_TERMINATE, State.NOT_SEEN, State.TERMINATES)
+    for a in (State.HAS_TO_TERMINATE, State.NOT_SEEN, State.TERMINATES)
+    for b in (State.HAS_TO_TERMINATE, State.NOT_SEEN, State.TERMINATES)
 }
 
 VISITED = {
-    TerminationData(S=s, after_arrow=flag): False
-    for flag in [True, False]
+    TerminationData(S=s, A=a, B=b, rule_parent=parent): False  # type: ignore
+    for parent in NONTERMINALS + [None]
     for s in (State.HAS_TO_TERMINATE, State.NOT_SEEN, State.TERMINATES)
+    for a in (State.HAS_TO_TERMINATE, State.NOT_SEEN, State.TERMINATES)
+    for b in (State.HAS_TO_TERMINATE, State.NOT_SEEN, State.TERMINATES)
 }
 
 
@@ -71,7 +87,7 @@ def visit_after_arrow(after_arrow_state: TerminationData):
             else State.TERMINATES
         )
         for c in TERMINALS[:-1]:
-            next_xT = TerminationData(after_arrow=False, **inits)
+            next_xT = TerminationData(**inits)
             TRANSITIONS[after_arrow_state].add(
                 Edge(
                     target=next_xT,
@@ -94,7 +110,7 @@ def visit_rule_start(current: TerminationData):
             else State.HAS_TO_TERMINATE
         )
 
-        after_T_arrow = TerminationData(after_arrow=True, **inits)
+        after_T_arrow = TerminationData(rule_parent=nonterm_name, **inits)  # type: ignore
         TRANSITIONS[current].add(
             Edge(
                 target=after_T_arrow,
@@ -108,7 +124,6 @@ def visit_rule_start(current: TerminationData):
 
             after_T_rhs = TerminationData(
                 **inner_inits,
-                after_arrow=False,
             )
             TRANSITIONS[after_T_arrow].add(
                 Edge(
@@ -120,7 +135,7 @@ def visit_rule_start(current: TerminationData):
 
 
 if __name__ == "__main__":
-    visit_rule_start(TerminationData(after_arrow=False))
+    visit_rule_start(TerminationData())
     print("digraph {")
     print("    rankdir=LR")
     print(
