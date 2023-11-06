@@ -2,6 +2,7 @@ package gluskov
 
 import (
 	"fmt"
+	"log"
 	"regexp"
 	"regexp/syntax"
 	"strconv"
@@ -38,7 +39,7 @@ func (m *Machine) handleRegex(node *syntax.Regexp, currentState State, isFinal b
 	case syntax.OpLiteral:
 		return m.handleLiteral(currentState, node, isFinal)
 	case syntax.OpConcat:
-		return m.handleConcatMulti(currentState, node, isFinal)
+		return m.handleConcatMulti(currentState, node)
 	case syntax.OpAlternate:
 		return m.handleAlternate(currentState, node, isFinal)
 	case syntax.OpStar:
@@ -48,7 +49,7 @@ func (m *Machine) handleRegex(node *syntax.Regexp, currentState State, isFinal b
 	case syntax.OpCharClass:
 		return m.handleCharClass(currentState, node, isFinal)
 	}
-	fmt.Println("ERROR: вот кто вышел за case:", node.Op)
+	log.Println("ERROR: вот кто вышел за case:", node.Op)
 	return []State{currentState}
 }
 
@@ -67,20 +68,6 @@ func (m *Machine) addState() State {
 
 func (m *Machine) addFinal(s State) {
 	m.FinalStates[s] = struct{}{}
-}
-
-func (m *Machine) GetRuneBetweenStates(left, right State) (rune, State) {
-	if right == 0 {
-		return 'я', 0
-	}
-	for r, states := range m.Transitions[left] {
-		for _, s := range states {
-			if s == right {
-				return r, s
-			}
-		}
-	}
-	return m.GetRuneBetweenStates(left, right-1)
 }
 
 func (m *Machine) handleLiteral(currentState State, node *syntax.Regexp, isFinal bool) []State {
@@ -106,13 +93,13 @@ func (m *Machine) handleAlternate(currentState State, node *syntax.Regexp, isFin
 	return []State{leftState[0], rightState[0]}
 }
 
-func (m *Machine) handleConcatMulti(currentState State, node *syntax.Regexp, isFinal bool) []State {
+func (m *Machine) handleConcatMulti(currentState State, node *syntax.Regexp) []State {
 
 	beforeState := m.handleRegex(node.Sub[0], currentState, false)
 
 	nextState := make([]State, 0)
 	for i := 1; i < len(node.Sub); i++ {
-		nextState = m.concatRange(beforeState, node.Sub[i], isFinal)
+		nextState = m.concatRange(beforeState, node.Sub[i], false)
 		beforeState = nextState
 	}
 
@@ -127,8 +114,7 @@ func (m *Machine) concatRange(leftState []State, node *syntax.Regexp, isFinal bo
 
 	newTransitions, err := getLetterTransitionAndNextState(currentTransitionsBefore, currentTransitionsAfter)
 	if err != nil {
-		// С логгированием тут можно будет warn бросать
-		fmt.Println("Ошибка в конкатенации", err)
+		log.Println("Ошибка в конкатенации", err)
 	}
 
 	for i := 1; i < len(leftState); i++ {
@@ -155,8 +141,7 @@ func (m *Machine) handleStar(currentState State, node *syntax.Regexp, isFinal bo
 
 	newTransitions, err := getLetterTransitionAndNextState(currentTransitionsBefore, currentTransitionsAfter)
 	if err != nil {
-		// С логгированием тут можно будет warn бросать
-		fmt.Println("Ошибка в звезде Клини", err)
+		log.Println("Ошибка в звезде Клини", err)
 	}
 
 	for i := 0; i < len(newTransitions) && i < len(endStarState); i++ {
@@ -225,7 +210,7 @@ func convertTransitions(letter rune, hash string) ([]oneTransition, error) {
 	for _, ha := range hashArr {
 		newState, err := strconv.Atoi(ha)
 		if err != nil {
-			fmt.Println("ошибка в convert transitions", err)
+			log.Println("ошибка в convert transitions", err)
 		}
 		ot = append(ot, oneTransition{letter: letter, newState: State(newState)})
 	}
@@ -242,7 +227,7 @@ func findDifferenceBetweenArray(letter rune, before, after string) []oneTransiti
 	for i := len(beforeStr); i < len(afterStr); i++ {
 		newState, err := strconv.Atoi(afterStr[i])
 		if err != nil {
-			fmt.Println("problem in star letter already exist")
+			log.Println("problem in star letter already exist")
 		}
 		ot = append(ot, oneTransition{letter: letter, newState: State(newState)})
 	}
@@ -335,7 +320,7 @@ func (m *Machine) finalStateCheck(regex string, fsw finalStateWord) {
 func checkWordInRegex(regex string, word string) bool {
 	ok, err := regexp.MatchString(regex, word)
 	if err != nil {
-		fmt.Println("error in match final state", err)
+		log.Println("error in match final state", err)
 	}
 	return ok
 }

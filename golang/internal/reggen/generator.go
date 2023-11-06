@@ -63,7 +63,7 @@ func (r *Regexes) Generate() []string {
 }
 
 func (rgp *RegexGeneratorParams) Generate() string {
-	regex := rgp.generateRegexRecursive(rgp.letterCount, rgp.alphabetSize)
+	regex := rgp.generateRegexRecursive(rgp.letterCount, rgp.starHeight)
 
 	if len(regex) == 0 {
 		return rgp.Generate()
@@ -72,7 +72,10 @@ func (rgp *RegexGeneratorParams) Generate() string {
 }
 
 func (rgp *RegexGeneratorParams) generateRegexRecursive(maxLength int, maxStarHeight int) string {
-	if maxLength <= 1 {
+	if maxLength < 1 || maxStarHeight < 1 {
+		return ""
+	}
+	if maxLength == 1 {
 		letter := getLetter(rand.Intn(rgp.alphabetSize))
 		return letter
 	}
@@ -81,12 +84,16 @@ func (rgp *RegexGeneratorParams) generateRegexRecursive(maxLength int, maxStarHe
 
 	switch operation {
 	case 0:
-		left := rgp.generateRegexRecursive(maxLength/2, maxStarHeight)
-		right := rgp.generateRegexRecursive(maxLength/2, maxStarHeight)
+		lenLeft := rand.Intn(maxLength)
+		lenRight := maxLength - lenLeft
+		left := rgp.generateRegexRecursive(lenLeft, maxStarHeight)
+		right := rgp.generateRegexRecursive(lenRight, maxStarHeight)
 		return concat(left, right)
 	case 1:
-		left := rgp.generateRegexRecursive(maxLength-1, maxStarHeight)
-		right := rgp.generateRegexRecursive(maxLength-1, maxStarHeight)
+		lenLeft := rand.Intn(maxLength)
+		lenRight := maxLength - lenLeft
+		left := rgp.generateRegexRecursive(lenLeft, maxStarHeight)
+		right := rgp.generateRegexRecursive(lenRight, maxStarHeight)
 		return alternative(left, right)
 	case 2:
 		letter := getLetter(rand.Intn(rgp.alphabetSize))

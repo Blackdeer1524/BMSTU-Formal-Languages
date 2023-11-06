@@ -2,7 +2,9 @@ package benchmark
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -21,8 +23,27 @@ var (
 	pythonScriptPath = basepath + "/regular_compression.py"
 )
 
-func EquivalenceCheck(reg *reggen.Regexes, rustBinaryPath string, countWords, maxDumpSize int) error {
-	words, err := prepareEnvironment(reg, rustBinaryPath, countWords, maxDumpSize)
+func Start(reg *reggen.Regexes, rustBinaryPath string,
+	benchCountWords, benchMaxDumpSize int,
+	equivalenceCountWords, equivalenceMaxDumpSize int,
+) error {
+	regexes := reg.Generate()
+
+	eErr := equivalenceCheck(regexes, rustBinaryPath, equivalenceCountWords, equivalenceMaxDumpSize)
+	if eErr != nil {
+		return fmt.Errorf("failed equivalence check %w", eErr)
+	}
+
+	bErr := benchmarkCheck(regexes, rustBinaryPath, benchCountWords, benchMaxDumpSize)
+	if bErr != nil {
+		return fmt.Errorf("failed benchmark check %w", bErr)
+	}
+
+	return nil
+}
+
+func equivalenceCheck(regexes []string, rustBinaryPath string, countWords, maxDumpSize int) error {
+	words, err := prepareEnvironment(regexes, rustBinaryPath, countWords, maxDumpSize)
 	if err != nil {
 		return err
 	}
@@ -33,9 +54,8 @@ func EquivalenceCheck(reg *reggen.Regexes, rustBinaryPath string, countWords, ma
 }
 
 func compareRegexWithWords(rwws []wordgen.RegexesWithWords) {
-
 	for _, rww := range rwws {
-		fmt.Printf("compare expected: %s regular with actual: %s\n", rww.RegexBefore, rww.RegexAfter)
+		log.Printf("compare expected: %s regular with actual: %s\n", rww.RegexBefore, rww.RegexAfter)
 		runWords(rww)
 	}
 }
@@ -43,9 +63,9 @@ func compareRegexWithWords(rwws []wordgen.RegexesWithWords) {
 func runWords(rww wordgen.RegexesWithWords) {
 	for _, word := range rww.Words {
 		if !equalMatched("^"+rww.RegexBefore+"$", "^"+rww.RegexAfter+"$", word) {
-			fmt.Printf("Don`t equal in word: %s\n", word)
+			log.Printf("Don`t equal in word: %s\n", word)
 		} else {
-			fmt.Printf("OK in: %s\n", word)
+			log.Printf("OK in: %s\n", word)
 		}
 	}
 }
@@ -56,13 +76,13 @@ func equalMatched(p1, p2, word string) bool {
 	return beforeMatched == afterMatched
 }
 
-func Start(reg *reggen.Regexes, rustBinaryPath string, countWords, maxDumpSize int) error {
-
-	words, err := prepareEnvironment(reg, rustBinaryPath, countWords, maxDumpSize)
+func benchmarkCheck(regexes []string, rustBinaryPath string, countWords, maxDumpSize int) error {
+	words, err := prepareEnvironment(regexes, rustBinaryPath, countWords, maxDumpSize)
 	if err != nil {
 		return err
 	}
 
+	// Тут я добавляю 'Z' к каждому слову в words
 	words, err = wordgen.GenerateWordsForBenchmarkRegexes(words)
 	if err != nil {
 		return err
@@ -76,14 +96,8 @@ func Start(reg *reggen.Regexes, rustBinaryPath string, countWords, maxDumpSize i
 }
 
 func prepareEnvironment(
-	reg *reggen.Regexes, rustBinaryPath string, countWords, maxDumpSize int,
+	regexes []string, rustBinaryPath string, countWords, maxDumpSize int,
 ) ([]wordgen.RegexesWithWords, error) {
-
-	regexes := reg.Generate()
-
-	fmt.Println("started generating...")
-
-	fmt.Println("regexes", regexes)
 
 	words, gErr := wordgen.GenerateWordsForRegexes(regexes, countWords, maxDumpSize)
 	if gErr != nil {
@@ -153,16 +167,15 @@ func runPythonScriptForPairRegexes(wordsWithRegex wordgen.RegexesWithWords) erro
 		return fmt.Errorf("failed to run after regexp %w", afterErr)
 	}
 
-	fmt.Printf(
+	log.Printf(
 		"\tto before: regex: %s, status: %s, duration: %s\n",
 		wordsWithRegex.RegexBefore, okBefore, durBefore,
 	)
-	fmt.Printf(
+	log.Printf(
 		"\tto after: regex: %s, status: %s, duration: %s\n",
 		wordsWithRegex.RegexAfter, okAfter, durAfter,
 	)
-
-	fmt.Println("_______________________")
+	log.Println("_______________________")
 
 	return nil
 }
@@ -191,15 +204,14 @@ func runPythonScriptForOneRegex(regexp string, words []string) (*time.Duration, 
 		if cmd.Process != nil {
 			err := cmd.Process.Kill()
 			if err != nil {
-				fmt.Println("failed to kill process")
+				log.Println("failed to kill process")
 			}
 		}
 	}()
 
 	if err := cmd.Wait(); err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok {
-			return nil, "", fmt.Errorf("failed to wait script %s", string(exitErr.Stderr))
-		} else {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
 			return nil, "", fmt.Errorf("failed to wait script %s", string(exitErr.Stderr))
 		}
 	}
