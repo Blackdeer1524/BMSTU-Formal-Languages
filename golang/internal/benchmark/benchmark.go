@@ -169,11 +169,11 @@ func runPythonScriptForPairRegexes(wordsWithRegex wordgen.RegexesWithWords) erro
 
 	log.Printf(
 		"\tto before: regex: %s, status: %s, duration: %s\n",
-		wordsWithRegex.RegexBefore, okBefore, durBefore,
+		wordsWithRegex.RegexBefore, okBefore, durBefore.String(),
 	)
 	log.Printf(
 		"\tto after: regex: %s, status: %s, duration: %s\n",
-		wordsWithRegex.RegexAfter, okAfter, durAfter,
+		wordsWithRegex.RegexAfter, okAfter, durAfter.String(),
 	)
 	log.Println("_______________________")
 
