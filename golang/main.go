@@ -8,10 +8,9 @@ import (
 )
 
 const (
-	benchCountWords       = 100
-	benchMaxDumpSize      = 200
-	equivalenceCountWords = 1
-
+	benchCountWords        = 100
+	benchMaxDumpSize       = 200
+	equivalenceCountWords  = 50
 	equivalenceMaxDumpSize = 5
 )
 
