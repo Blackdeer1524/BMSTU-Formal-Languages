@@ -1,117 +1,15 @@
-package main
+package parsing
 
 import (
-	"bufio"
 	"fmt"
-	"io"
-	"log"
-	"os"
-	"strings"
+	"unicode/utf8"
 )
-
-func extractFirstRune(s string) rune {
-	var first rune
-	for _, c := range s {
-		first = c
-		break
-	}
-	return first
-}
 
 const (
 	EPSILON = 'ε'
 	EOS     = '$'
 	START   = 'S'
 )
-
-func parseInput(r *bufio.Reader) (terms map[rune]struct{}, var2productions map[rune][]string) {
-	var2productions = make(map[rune][]string)
-
-	terms = make(map[rune]struct{})
-	terms[EOS] = struct{}{}
-
-	nonTerminalsStr, err := r.ReadString('\n')
-	if err != nil {
-		panic(err)
-	}
-
-	for _, term := range strings.Split(nonTerminalsStr, ",") {
-		term = strings.Trim(term, " ")
-		if len(term) != 1 {
-			log.Println("wrong terminal declaration [1]: terminal length has to be 1")
-			continue
-		}
-
-		terms[extractFirstRune(term)] = struct{}{}
-	}
-
-	lineNumber := 1
-	for {
-		lineNumber += 1
-
-		productionStr, err := r.ReadString('\n')
-		if len(productionStr) > 0 && productionStr[len(productionStr)-1] == '\n' {
-			productionStr = productionStr[:len(productionStr)-1]
-		}
-		if len(productionStr) == 0 && err == nil {
-			continue
-		}
-
-		splitRes := strings.SplitN(productionStr, "->", 2)
-		if len(splitRes) != 2 {
-			log.Println("wrong production [", lineNumber, "]: separator not found")
-			continue
-		}
-
-		lhs := strings.Trim(splitRes[0], " ")
-		if len(lhs) != 1 {
-			log.Println("wrong production [", lineNumber, "]: length of left hand side has to be 1")
-			continue
-		}
-		varName := extractFirstRune(lhs)
-
-		if _, ok := var2productions[varName]; ok {
-			log.Println(
-				"warning [",
-				lineNumber,
-				"]: nonterm with name",
-				varName,
-				" already defined, thus overwriting",
-			)
-		}
-		var2productions[varName] = make([]string, 0)
-
-		rhs := splitRes[1]
-		rightProductions := strings.Split(rhs, "|")
-		for i := range rightProductions {
-			rightProductions[i] = strings.Trim(rightProductions[i], " ")
-			if len(rightProductions[i]) == 0 {
-				log.Println(
-					"warning [",
-					lineNumber,
-					"]:",
-					i,
-					"th production is empty. To set up ε-production you have to use 'ε' explicitly",
-				)
-				continue
-			}
-
-			if varName == START {
-				rightProductions[i] = fmt.Sprintf("%s%c", rightProductions[i], EOS)
-			}
-			var2productions[varName] = append(var2productions[varName], rightProductions[i])
-		}
-
-		if err != nil {
-			if err == io.EOF {
-				return
-			}
-			panic(err)
-		}
-	}
-}
-
-// TODO: nonterm reachability check
 
 func getEpsInfo(terms map[rune]struct{}, productions map[rune][]string) (res map[rune]bool) {
 	res = make(map[rune]bool, len(productions))
@@ -140,7 +38,7 @@ func getEpsInfo(terms map[rune]struct{}, productions map[rune][]string) (res map
 
 		isNullGenerating := false
 		for _, prod := range productions[variable] {
-			if len(prod) == 1 && extractFirstRune(prod) == EPSILON {
+			if utf8.RuneCountInString(prod) == 1 && extractFirstRune(prod) == EPSILON {
 				isNullGenerating = true
 				break
 			}
@@ -168,10 +66,9 @@ func getEpsInfo(terms map[rune]struct{}, productions map[rune][]string) (res map
 	}
 
 	for nonTerm := range productions {
-		if _, ok := visited[nonTerm]; ok {
-			continue
+		if visited[nonTerm] == WHITE {
+			visitVar(nonTerm)
 		}
-		visitVar(nonTerm)
 	}
 
 	return res
@@ -195,8 +92,11 @@ func getFirstInfo(
 		visited[nonterm] = struct{}{}
 
 		first := make(map[rune]struct{})
+		if epsInfo[nonterm] {
+			first[EPSILON] = struct{}{}
+		}
 		for _, prod := range productions[nonterm] {
-			if len(prod) == 1 && extractFirstRune(prod) == EPSILON {
+			if utf8.RuneCountInString(prod) == 1 && extractFirstRune(prod) == EPSILON {
 				continue
 			}
 
@@ -221,63 +121,6 @@ func getFirstInfo(
 
 	for variable := range productions {
 		varFirst(variable)
-	}
-
-	return res
-}
-
-func extractPair(str string) (f rune, s rune) {
-	for i, c := range str {
-		if i == 0 {
-			f = c
-		} else {
-			s = c
-		}
-	}
-	return
-}
-
-func mergeInPlace(dst map[rune]struct{}, src map[rune]struct{}) {
-	for key := range src {
-		dst[key] = struct{}{}
-	}
-}
-
-func topoSort(dependencies map[rune]map[rune]struct{}) []rune {
-	type color int
-	const (
-		WHITE color = iota // haven't seen yet
-		GREY               // yet to finish processing
-		BLACK              // processed
-	)
-
-	visited := make(map[rune]color)
-	for v := range dependencies {
-		visited[v] = WHITE
-	}
-
-	res := make([]rune, 0)
-
-	var topoVisit func(rune)
-	topoVisit = func(v rune) {
-		if visited[v] == GREY {
-			panic(fmt.Sprintf("cyclic dependency found on var %c", v))
-		}
-
-		visited[v] = GREY
-		for d := range dependencies[v] {
-			topoVisit(d)
-			res = append(res, d)
-		}
-		res = append(res, v)
-
-		visited[v] = BLACK
-	}
-
-	for v := range dependencies {
-		if visited[v] == WHITE {
-			topoVisit(v)
-		}
 	}
 
 	return res
@@ -331,24 +174,42 @@ func strInfo(
 	terms map[rune]struct{},
 	epsInfo map[rune]bool,
 	firstInfo map[rune]map[rune]struct{},
-	followInfo map[rune]map[rune]struct{},
 ) (first map[rune]struct{}, eps bool) {
-	res := make(map[rune]struct{})
+	first = make(map[rune]struct{})
+	eps = false
 	if len(alpha) == 0 {
-		return res, false
+		return
 	}
 
 	for _, c := range alpha {
 		if _, ok := terms[c]; ok {
-			res[c] = struct{}{}
-			return res, false
+			first[c] = struct{}{}
+			return
 		}
-		mergeInPlace(res, firstInfo[c])
+		if c == EPSILON {
+			eps = true
+			continue
+		}
+
+		mergeInPlace(first, firstInfo[c])
+		delete(first, EPSILON)
+
 		if !epsInfo[c] {
-			return res, false
+			return
 		}
 	}
-	return res, true
+	eps = true
+	return
+}
+
+func printFirstTable(first map[rune]map[rune]struct{}) {
+	for v, next := range first {
+		fmt.Printf("Follow(%c): {", v)
+		for n := range next {
+			fmt.Printf("%c, ", n)
+		}
+		fmt.Printf("}\n")
+	}
 }
 
 func BuildTable(
@@ -357,6 +218,7 @@ func BuildTable(
 ) map[rune]map[rune]string {
 	epsInfo := getEpsInfo(terms, productions)
 	firstInfo := getFirstInfo(terms, productions, epsInfo)
+	printFirstTable(firstInfo)
 	followInfo := getFollowInfo(terms, productions, epsInfo, firstInfo)
 
 	res := make(map[rune]map[rune]string, len(productions))
@@ -370,7 +232,7 @@ func BuildTable(
 	for v, prods := range productions {
 		for _, prod := range prods {
 			// https://web.cs.wpi.edu/~kal/PLT/PLT4.3.html
-			firstSet, eps := strInfo(prod, terms, epsInfo, firstInfo, followInfo)
+			firstSet, eps := strInfo(prod, terms, epsInfo, firstInfo)
 			for a := range firstSet {
 				if res[v][a] != "" {
 					panic("conflict found")
@@ -378,21 +240,16 @@ func BuildTable(
 				res[v][a] = prod
 			}
 			if eps {
-				for b := range followInfo[v] {
-					if res[v][b] != "" {
-						panic("conflict found")
+				if _, ok := firstSet[EOS]; ok {
+					res[v][EOS] = string(EPSILON)
+				} else {
+					for b := range followInfo[v] {
+						res[v][b] = string(EPSILON)
 					}
-					res[v][b] = prod
 				}
 			}
 		}
 	}
 
 	return res
-}
-
-func main() {
-	fmt.Println("%c", EPSILON)
-	reader := bufio.NewReader(os.Stdin)
-	terms, productions := parseInput(reader)
 }
