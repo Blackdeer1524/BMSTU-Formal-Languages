@@ -1,8 +1,10 @@
 package utils
 
-import "fmt"
+import (
+	"fmt"
+)
 
-func extractFirstRune(s string) rune {
+func ExtractFirstRune(s string) rune {
 	var first rune
 	for _, c := range s {
 		first = c
@@ -11,7 +13,7 @@ func extractFirstRune(s string) rune {
 	return first
 }
 
-func extractPair(str string) (f rune, s rune) {
+func ExtractPair(str string) (f rune, s rune) {
 	for i, c := range str {
 		if i == 0 {
 			f = c
@@ -22,13 +24,13 @@ func extractPair(str string) (f rune, s rune) {
 	return
 }
 
-func mergeInPlace(dst map[rune]struct{}, src map[rune]struct{}) {
+func MergeInPlace(dst map[rune]struct{}, src map[rune]struct{}) {
 	for key := range src {
 		dst[key] = struct{}{}
 	}
 }
 
-func topoSort(dependencies map[rune]map[rune]struct{}) []rune {
+func TopoSort(dependencies map[rune]map[rune]struct{}) []rune {
 	type color int
 	const (
 		WHITE color = iota // haven't seen yet

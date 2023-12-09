@@ -3,7 +3,14 @@ package parsing
 import (
 	"fmt"
 	"unicode/utf8"
+
+	"LL1/internal/utils"
 )
+
+type GrammarInfo struct {
+	Terms       map[rune]struct{}
+	Productions map[rune][]string
+}
 
 const (
 	EPSILON = 'ε'
@@ -38,7 +45,7 @@ func getEpsInfo(terms map[rune]struct{}, productions map[rune][]string) (res map
 
 		isNullGenerating := false
 		for _, prod := range productions[variable] {
-			if utf8.RuneCountInString(prod) == 1 && extractFirstRune(prod) == EPSILON {
+			if utf8.RuneCountInString(prod) == 1 && utils.ExtractFirstRune(prod) == EPSILON {
 				isNullGenerating = true
 				break
 			}
@@ -96,7 +103,7 @@ func getFirstInfo(
 			first[EPSILON] = struct{}{}
 		}
 		for _, prod := range productions[nonterm] {
-			if utf8.RuneCountInString(prod) == 1 && extractFirstRune(prod) == EPSILON {
+			if utf8.RuneCountInString(prod) == 1 && utils.ExtractFirstRune(prod) == EPSILON {
 				continue
 			}
 
@@ -142,7 +149,7 @@ func getFollowInfo(
 	for _, prods := range productions {
 		for _, prod := range prods {
 			for i := 0; i < len(prod)-1; i++ {
-				f, s := extractPair(prod[i : i+2])
+				f, s := utils.ExtractPair(prod[i : i+2])
 				if _, ok := terms[f]; ok {
 					continue
 				}
@@ -150,7 +157,7 @@ func getFollowInfo(
 				if _, ok := terms[s]; ok {
 					followSets[f][s] = struct{}{}
 				} else {
-					mergeInPlace(followSets[f], firstInfo[s])
+					utils.MergeInPlace(followSets[f], firstInfo[s])
 					if epsInfo[s] {
 						dependencies[f][s] = struct{}{}
 					}
@@ -159,10 +166,10 @@ func getFollowInfo(
 		}
 	}
 
-	order := topoSort(dependencies)
+	order := utils.TopoSort(dependencies)
 	for _, v := range order {
 		for dep := range dependencies[v] {
-			mergeInPlace(followSets[v], followSets[dep])
+			utils.MergeInPlace(followSets[v], followSets[dep])
 		}
 	}
 
@@ -191,7 +198,7 @@ func strInfo(
 			continue
 		}
 
-		mergeInPlace(first, firstInfo[c])
+		utils.MergeInPlace(first, firstInfo[c])
 		delete(first, EPSILON)
 
 		if !epsInfo[c] {
