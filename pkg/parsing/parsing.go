@@ -18,8 +18,8 @@ const (
 	START   = 'S'
 )
 
-func getEpsInfo(terms map[rune]struct{}, productions map[rune][]string) (res map[rune]bool) {
-	res = make(map[rune]bool, len(productions))
+func getEpsInfo(info GrammarInfo) (res map[rune]bool) {
+	res = make(map[rune]bool, len(info.Productions))
 
 	type color int
 	const (
@@ -27,9 +27,9 @@ func getEpsInfo(terms map[rune]struct{}, productions map[rune][]string) (res map
 		GREY               // yet to finish processing
 		BLACK              // processed
 	)
-	visited := make(map[rune]color, len(productions))
+	visited := make(map[rune]color, len(info.Productions))
 
-	for key := range productions {
+	for key := range info.Productions {
 		res[key] = false
 		visited[key] = WHITE
 	}
@@ -44,15 +44,16 @@ func getEpsInfo(terms map[rune]struct{}, productions map[rune][]string) (res map
 		visited[variable] = GREY
 
 		isNullGenerating := false
-		for _, prod := range productions[variable] {
-			if utf8.RuneCountInString(prod) == 1 && utils.ExtractFirstRune(prod) == EPSILON {
+		for _, prod := range info.Productions[variable] {
+			if utf8.RuneCountInString(prod) == 1 &&
+				utils.ExtractFirstRune(prod) == EPSILON {
 				isNullGenerating = true
 				break
 			}
 
 			isEpsProduction := true
 			for _, c := range prod {
-				if _, ok := terms[c]; ok {
+				if _, ok := info.Terms[c]; ok {
 					isEpsProduction = false
 					continue
 				}
@@ -72,7 +73,7 @@ func getEpsInfo(terms map[rune]struct{}, productions map[rune][]string) (res map
 		return isNullGenerating
 	}
 
-	for nonTerm := range productions {
+	for nonTerm := range info.Productions {
 		if visited[nonTerm] == WHITE {
 			visitVar(nonTerm)
 		}
@@ -82,8 +83,7 @@ func getEpsInfo(terms map[rune]struct{}, productions map[rune][]string) (res map
 }
 
 func getFirstInfo(
-	terms map[rune]struct{},
-	productions map[rune][]string,
+	info GrammarInfo,
 	epsInfo map[rune]bool,
 ) map[rune]map[rune]struct{} {
 	res := make(map[rune]map[rune]struct{})
@@ -102,13 +102,14 @@ func getFirstInfo(
 		if epsInfo[nonterm] {
 			first[EPSILON] = struct{}{}
 		}
-		for _, prod := range productions[nonterm] {
-			if utf8.RuneCountInString(prod) == 1 && utils.ExtractFirstRune(prod) == EPSILON {
+		for _, prod := range info.Productions[nonterm] {
+			if utf8.RuneCountInString(prod) == 1 &&
+				utils.ExtractFirstRune(prod) == EPSILON {
 				continue
 			}
 
 			for _, c := range prod {
-				if _, ok := terms[c]; ok {
+				if _, ok := info.Terms[c]; ok {
 					first[c] = struct{}{}
 					break
 				}
@@ -126,42 +127,99 @@ func getFirstInfo(
 		res[nonterm] = first
 	}
 
-	for variable := range productions {
+	for variable := range info.Productions {
 		varFirst(variable)
 	}
 
 	return res
 }
 
+func pairIter(s string, c chan<- rune, done chan<- struct{}) {
+	for _, chr := range s {
+		c <- chr
+	}
+	done <- struct{}{}
+}
+
 func getFollowInfo(
-	terms map[rune]struct{},
-	productions map[rune][]string,
+	info GrammarInfo,
 	epsInfo map[rune]bool,
 	firstInfo map[rune]map[rune]struct{},
 ) map[rune]map[rune]struct{} {
 	followSets := make(map[rune]map[rune]struct{})
 	dependencies := make(map[rune]map[rune]struct{})
-	for variable := range productions {
+	for variable := range info.Productions {
 		followSets[variable] = make(map[rune]struct{})
 		dependencies[variable] = make(map[rune]struct{})
 	}
 
-	for _, prods := range productions {
+	c := make(chan rune)
+	done := make(chan struct{})
+	for v, prods := range info.Productions {
 		for _, prod := range prods {
+			if utf8.RuneCountInString(prod) == 1 {
+				f := utils.ExtractFirstRune(prod)
+				dependencies[f][v] = struct{}{}
+				continue
+			}
+
+			// 	go pairIter(prod, c, done)
+			// 	var f, s rune
+			// 	s = <-c
+			// 	suffixStart := 1
+			// L:
+			// 	for {
+			// 		f = s
+			// 		select {
+			// 		case s = <-c:
+			// 		case <-done:
+			// 			break L
+			// 		}
+			// 		suffixStart++
+			//
+			// 		if _, ok := info.Terms[f]; ok {
+			// 			continue
+			// 		}
+			//
+			// 		if _, ok := info.Terms[s]; ok {
+			// 			followSets[f][s] = struct{}{}
+			// 		} else {
+			// 			suffix := prod[suffixStart:]
+			// 			utils.MergeInPlace(followSets[f], tInfo(suffix, info.Terms, epsInfo, firstInfo))
+			//
+			// 			utils.MergeInPlace(followSets[f], firstInfo[s])
+			// 			delete(followSets[f], EPSILON)
+			//
+			// 			strInfo(prod[suffixStart:], info.Terms, epsInfo, firstInfo)
+			// 			if epsInfo[s] {
+			// 				dependencies[f][s] = struct{}{}
+			// 			}
+			// 		}
+			// 	}
+
+			for i, f := range prod {
+			}
+
 			for i := 0; i < len(prod)-1; i++ {
-				f, s := utils.ExtractPair(prod[i : i+2])
-				if _, ok := terms[f]; ok {
+				f, s = utils.ExtractPair(prod[i : i+2])
+				if _, ok := info.Terms[f]; ok {
 					continue
 				}
 
-				if _, ok := terms[s]; ok {
+				if _, ok := info.Terms[s]; ok {
 					followSets[f][s] = struct{}{}
 				} else {
 					utils.MergeInPlace(followSets[f], firstInfo[s])
-					if epsInfo[s] {
-						dependencies[f][s] = struct{}{}
-					}
+					delete(followSets[f], EPSILON)
+
+					// strInfo(alpha string, terms map[rune]struct{}, epsInfo map[rune]bool, firstInfo map[rune]map[rune]struct{})
+					// if epsInfo[s] {
+					// 	dependencies[f][s] = struct{}{}
+					// }
 				}
+			}
+			if _, ok := info.Terms[s]; !ok {
+				dependencies[s][v] = struct{}{}
 			}
 		}
 	}
@@ -170,6 +228,7 @@ func getFollowInfo(
 	for _, v := range order {
 		for dep := range dependencies[v] {
 			utils.MergeInPlace(followSets[v], followSets[dep])
+			delete(followSets[v], EPSILON)
 		}
 	}
 
@@ -219,27 +278,25 @@ func printFirstTable(first map[rune]map[rune]struct{}) {
 	}
 }
 
-func BuildTable(
-	terms map[rune]struct{},
-	productions map[rune][]string,
-) map[rune]map[rune]string {
-	epsInfo := getEpsInfo(terms, productions)
-	firstInfo := getFirstInfo(terms, productions, epsInfo)
+// BuildTable Builds a table for LL(1) parser
+func BuildTable(info GrammarInfo) map[rune]map[rune]string {
+	epsInfo := getEpsInfo(info)
+	firstInfo := getFirstInfo(info, epsInfo)
 	printFirstTable(firstInfo)
-	followInfo := getFollowInfo(terms, productions, epsInfo, firstInfo)
+	followInfo := getFollowInfo(info, epsInfo, firstInfo)
 
-	res := make(map[rune]map[rune]string, len(productions))
-	for v := range productions {
-		res[v] = make(map[rune]string, len(terms))
-		for t := range terms {
+	res := make(map[rune]map[rune]string, len(info.Productions))
+	for v := range info.Productions {
+		res[v] = make(map[rune]string, len(info.Terms))
+		for t := range info.Terms {
 			res[v][t] = ""
 		}
 	}
 
-	for v, prods := range productions {
+	for v, prods := range info.Productions {
 		for _, prod := range prods {
 			// https://web.cs.wpi.edu/~kal/PLT/PLT4.3.html
-			firstSet, eps := strInfo(prod, terms, epsInfo, firstInfo)
+			firstSet, eps := strInfo(prod, info.Terms, epsInfo, firstInfo)
 			for a := range firstSet {
 				if res[v][a] != "" {
 					panic("conflict found")

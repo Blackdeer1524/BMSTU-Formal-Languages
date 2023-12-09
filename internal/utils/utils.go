@@ -4,6 +4,7 @@ import (
 	"fmt"
 )
 
+// ExtractFirstRune extracts first rune from a given string
 func ExtractFirstRune(s string) rune {
 	var first rune
 	for _, c := range s {
@@ -13,6 +14,7 @@ func ExtractFirstRune(s string) rune {
 	return first
 }
 
+// ExtractPair extracts first two runes from a given string
 func ExtractPair(str string) (f rune, s rune) {
 	for i, c := range str {
 		if i == 0 {
@@ -24,12 +26,14 @@ func ExtractPair(str string) (f rune, s rune) {
 	return
 }
 
+// MergeInPlace merges two sets together
 func MergeInPlace(dst map[rune]struct{}, src map[rune]struct{}) {
 	for key := range src {
 		dst[key] = struct{}{}
 	}
 }
 
+// TopoSort sorts topologically given dependecies graph
 func TopoSort(dependencies map[rune]map[rune]struct{}) []rune {
 	type color int
 	const (
