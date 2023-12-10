@@ -73,7 +73,7 @@ func testFirstHelper(res map[rune]map[rune]struct{}, v rune, n int, exp []rune) 
 
 	for _, e := range exp {
 		if _, ok := res[v][e]; !ok {
-			message.WriteString(fmt.Sprintf("Expected '%c' to be in First(%c); ", e, v)) 
+			message.WriteString(fmt.Sprintf("Expected '%c' to be in First(%c); ", e, v))
 		}
 	}
 	if message.Len() > 0 {
@@ -254,6 +254,13 @@ func TestFollow(t *testing.T) {
 	}
 }
 
+func testTableHelper(table map[rune]map[rune]string, v rune, t rune, exp string) error {
+	if table[v][t] != exp {
+		return fmt.Errorf("expected %s, but %s found", exp, table[v][t])
+	}
+	return nil
+}
+
 func TestTable(t *testing.T) {
 	info := GrammarInfo{
 		Terms:       map[rune]struct{}{},
@@ -276,6 +283,21 @@ func TestTable(t *testing.T) {
 	info.Productions['P'] = []string{"*FP", string(EPSILON)}
 	info.Productions['F'] = []string{"i", "(E)"}
 
-	// res := BuildTable(info)
-	// if len(res) ==
+	res := BuildTable(info)
+
+	// E' = Q; T' = P
+	exp := map[rune]map[rune]string{
+		'E': {'i': "TQ", '(': "TQ"},
+		'Q': {'+': "+TQ", ')': "ε", '$': "ε"},
+		'T': {'i': "FP", '(': "FP"},
+		'P': {'+': "ε", '*': "*FP", ')': "ε", '$': "ε"},
+		'F': {'i': "i", '(': "(E)"},
+	}
+	for v, row := range exp {
+		for term, entry := range row {
+			if res[v][term] != entry {
+				t.Errorf("[%c][%c] missmatch: expected %s, got %s", v, term, entry, res[v][term])
+			}
+		}
+	}
 }
