@@ -3,12 +3,7 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"io"
-	"log"
 	"os"
-	"strings"
-	"unicode"
-	"unicode/utf8"
 )
 
 // TODO: nonterm reachability check

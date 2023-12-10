@@ -65,16 +65,22 @@ func TestEps(t *testing.T) {
 	}
 }
 
-func testFirstHelper(t *testing.T, res map[rune]map[rune]struct{}, v rune, n int, exp []rune) {
+func testFirstHelper(res map[rune]map[rune]struct{}, v rune, n int, exp []rune) error {
+	var message strings.Builder
 	if len(res[v]) != n {
-		t.Errorf("Expeceted %d, found %d", n, len(res[v]))
+		message.WriteString(fmt.Sprintf("Expeceted %d, found %d; ", n, len(res[v])))
 	}
 
 	for _, e := range exp {
 		if _, ok := res[v][e]; !ok {
-			t.Errorf("Expected '%c' to be in First(%c)", e, v)
+			message.WriteString(fmt.Sprintf("Expected '%c' to be in First(%c); ", e, v)) 
 		}
 	}
+	if message.Len() > 0 {
+		return fmt.Errorf("%s", message.String())
+	}
+
+	return nil
 }
 
 func TestFirst(t *testing.T) {
@@ -95,9 +101,24 @@ func TestFirst(t *testing.T) {
 	epsInfo := getEpsInfo(info)
 	res := getFirstInfo(info, epsInfo)
 
-	testFirstHelper(t, res, 'S', 1, []rune{'a'})
-	testFirstHelper(t, res, 'A', 3, []rune{'a', 'b', EPSILON})
-	testFirstHelper(t, res, 'C', 1, []rune{'b'})
+	{
+		err := testFirstHelper(res, 'S', 1, []rune{'a'})
+		if err != nil {
+			t.Error(err.Error())
+		}
+	}
+	{
+		err := testFirstHelper(res, 'A', 3, []rune{'a', 'b', EPSILON})
+		if err != nil {
+			t.Error(err.Error())
+		}
+	}
+	{
+		err := testFirstHelper(res, 'C', 1, []rune{'b'})
+		if err != nil {
+			t.Error(err.Error())
+		}
+	}
 }
 
 func TestFirstHard(t *testing.T) {
@@ -125,23 +146,54 @@ func TestFirstHard(t *testing.T) {
 	epsInfo := getEpsInfo(info)
 	res := getFirstInfo(info, epsInfo)
 
-	testFirstHelper(t, res, 'E', 2, []rune{'i', '('})
-	testFirstHelper(t, res, 'Q', 2, []rune{'+', EPSILON})
-	testFirstHelper(t, res, 'T', 2, []rune{'i', '('})
-	testFirstHelper(t, res, 'P', 2, []rune{'*', EPSILON})
-	testFirstHelper(t, res, 'F', 2, []rune{'i', '('})
-}
-
-func testFollowHelper(t *testing.T, res map[rune]map[rune]struct{}, v rune, n int, exp []rune) {
-	if len(res[v]) != n {
-		t.Errorf("[%c] Expeceted %d, found %d", v, n, len(res[v]))
-	}
-
-	for _, e := range exp {
-		if _, ok := res[v][e]; !ok {
-			t.Errorf("Expected '%c' to be in Follow(%c) = %s", e, v, printSet(res[v]))
+	{
+		err := testFirstHelper(res, 'E', 2, []rune{'i', '('})
+		if err != nil {
+			t.Error(err.Error())
 		}
 	}
+	{
+		err := testFirstHelper(res, 'Q', 2, []rune{'+', EPSILON})
+		if err != nil {
+			t.Error(err.Error())
+		}
+	}
+	{
+		err := testFirstHelper(res, 'T', 2, []rune{'i', '('})
+		if err != nil {
+			t.Error(err.Error())
+		}
+	}
+	{
+		err := testFirstHelper(res, 'P', 2, []rune{'*', EPSILON})
+		if err != nil {
+			t.Error(err.Error())
+		}
+	}
+	{
+		err := testFirstHelper(res, 'F', 2, []rune{'i', '('})
+		if err != nil {
+			t.Error(err.Error())
+		}
+	}
+}
+
+func testFollowHelper(res map[rune]map[rune]struct{}, v rune, n int, exp []rune) error {
+	var message strings.Builder
+	for _, e := range exp {
+		if _, ok := res[v][e]; !ok {
+			message.WriteString(fmt.Sprintf("Expected '%c' to be in Follow(%c) = %s; ", e, v, printSet(res[v])))
+		}
+	}
+	if len(res[v]) != n {
+		message.WriteString(fmt.Sprintf("[%c] length mismatch: expected %d found %d (%s); ", v, n, len(res[v]), printSet(res[v])))
+	}
+
+	if message.Len() > 0 {
+		return fmt.Errorf("%s", message.String())
+	}
+
+	return nil
 }
 
 func TestFollow(t *testing.T) {
@@ -170,9 +222,60 @@ func TestFollow(t *testing.T) {
 	firstInfo := getFirstInfo(info, epsInfo)
 	res := getFollowInfo(info, epsInfo, firstInfo)
 
-	testFollowHelper(t, res, 'E', 2, []rune{'$', ')'})
-	testFollowHelper(t, res, 'Q', 2, []rune{'$', ')'})
-	testFollowHelper(t, res, 'T', 3, []rune{'+', '$', ')'})
-	testFollowHelper(t, res, 'P', 3, []rune{'+', '$', ')'})
-	testFollowHelper(t, res, 'F', 4, []rune{'+', '*', '$', ')'})
+	{
+		err := testFollowHelper(res, 'E', 2, []rune{'$', ')'})
+		if err != nil {
+			t.Error(err.Error())
+		}
+	}
+	{
+		err := testFollowHelper(res, 'Q', 2, []rune{'$', ')'})
+		if err != nil {
+			t.Error(err.Error())
+		}
+	}
+	{
+		err := testFollowHelper(res, 'T', 3, []rune{'+', '$', ')'})
+		if err != nil {
+			t.Error(err.Error())
+		}
+	}
+	{
+		err := testFollowHelper(res, 'P', 3, []rune{'+', '$', ')'})
+		if err != nil {
+			t.Error(err.Error())
+		}
+	}
+	{
+		err := testFollowHelper(res, 'F', 4, []rune{'+', '*', '$', ')'})
+		if err != nil {
+			t.Error(err.Error())
+		}
+	}
+}
+
+func TestTable(t *testing.T) {
+	info := GrammarInfo{
+		Terms:       map[rune]struct{}{},
+		Productions: map[rune][]string{},
+	}
+	info.Terms['+'] = struct{}{}
+	info.Terms['*'] = struct{}{}
+	info.Terms['i'] = struct{}{}
+	info.Terms['a'] = struct{}{}
+	info.Terms['('] = struct{}{}
+	info.Terms[')'] = struct{}{}
+	info.Terms['$'] = struct{}{}
+	info.Terms[EPSILON] = struct{}{}
+
+	// E' = Q; T' = P
+	info.Productions['S'] = []string{"E$"}
+	info.Productions['E'] = []string{"TQ"}
+	info.Productions['Q'] = []string{"+TQ", string(EPSILON)}
+	info.Productions['T'] = []string{"FP"}
+	info.Productions['P'] = []string{"*FP", string(EPSILON)}
+	info.Productions['F'] = []string{"i", "(E)"}
+
+	// res := BuildTable(info)
+	// if len(res) ==
 }

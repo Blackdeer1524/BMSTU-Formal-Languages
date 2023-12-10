@@ -165,7 +165,7 @@ func getFollowInfo(
 				delete(suffixFrist, EPSILON)
 
 				utils.MergeInPlace(followSets[f], suffixFrist)
-				if producesEps {
+				if producesEps || len(suffixFrist) == 0 {
 					dependencies[f][v] = struct{}{}
 				}
 
@@ -191,7 +191,6 @@ func strInfo(
 	firstInfo map[rune]map[rune]struct{},
 ) (first map[rune]struct{}) {
 	first = make(map[rune]struct{})
-	first[EPSILON] = struct{}{}
 	if len(alpha) == 0 {
 		return
 	}
@@ -202,16 +201,15 @@ func strInfo(
 				continue
 			}
 			first[c] = struct{}{}
-			delete(first, EPSILON)
 			return
 		}
 
 		utils.MergeInPlace(first, firstInfo[c])
 		if !epsInfo[c] {
-			delete(first, EPSILON)
 			return
 		}
 	}
+	first[EPSILON] = struct{}{}
 	return
 }
 
@@ -225,7 +223,9 @@ func printFirstTable(first map[rune]map[rune]struct{}) {
 	}
 }
 
-// BuildTable Builds a table for LL(1) parser
+// BuildTable builds a table for LL(1) parser
+//
+// Table = Variables x Terminals
 func BuildTable(info GrammarInfo) map[rune]map[rune]string {
 	epsInfo := getEpsInfo(info)
 	firstInfo := getFirstInfo(info, epsInfo)
