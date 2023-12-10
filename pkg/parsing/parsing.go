@@ -3,6 +3,7 @@ package parsing
 import (
 	"fmt"
 
+	"LL1/internal/graphs"
 	"LL1/internal/utils"
 )
 
@@ -172,7 +173,7 @@ func getFollowInfo(
 		}
 	}
 
-	order := utils.TopoSort(dependencies)
+	order := graphs.TopoSort(dependencies)
 	for _, v := range order {
 		for dep := range dependencies[v] {
 			utils.MergeInPlace(followSets[v], followSets[dep])

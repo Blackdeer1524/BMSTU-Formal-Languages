@@ -2,46 +2,53 @@ package graphs
 
 import "fmt"
 
-// TopoSort sorts topologically given dependecies graph
-func TopoSort(dependencies map[rune]map[rune]struct{}) []rune {
-	type color int
-	const (
-		WHITE color = iota // haven't seen yet
-		GREY               // yet to finish processing
-		BLACK              // processed
-	)
+type color int
 
-	visited := make(map[rune]color)
-	for v := range dependencies {
-		visited[v] = WHITE
+const (
+	white color = iota // haven't seen yet
+	grey               // yet to finish processing
+	black              // processed
+)
+
+// TopoSort sorts topologically given dependecies graph
+func TopoSort(deps map[rune]map[rune]struct{}) []rune {
+	condGraph := buildCondensedGraph(deps)
+
+	visited := make(map[int]color)
+	for v := range condGraph {
+		visited[v] = white
 	}
 
-	res := make([]rune, 0)
+	condSorted := make([]int, 0)
 
-	var topoVisit func(rune)
-	topoVisit = func(v rune) {
-		if visited[v] == GREY {
+	var topoVisit func(int)
+	topoVisit = func(v int) {
+		if visited[v] == grey {
 			panic(fmt.Sprintf("cyclic dependency found on var %c", v))
-		} else if visited[v] == BLACK {
+		} else if visited[v] == black {
 			return
 		}
 
-		visited[v] = GREY
-		for d := range dependencies[v] {
-			if d != v {
-				topoVisit(d)
-			}
-			res = append(res, d)
+		visited[v] = grey
+		for d := range condGraph[v].Next {
+			topoVisit(d)
+			condSorted = append(condSorted, d)
 		}
-		res = append(res, v)
+		condSorted = append(condSorted, v)
 
-		visited[v] = BLACK
+		visited[v] = black
 	}
 
-	for v := range dependencies {
-		if visited[v] == WHITE {
+	for v := range condGraph {
+		if visited[v] == white {
 			topoVisit(v)
 		}
+	}
+
+	res := make([]rune, 0)
+	for _, compIndex := range condSorted {
+		res = append(res, condGraph[compIndex].Nodes...)
+		res = append(res, condGraph[compIndex].Nodes[0])
 	}
 
 	return res

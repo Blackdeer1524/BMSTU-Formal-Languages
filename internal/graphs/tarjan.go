@@ -4,7 +4,7 @@ import (
 	"LL1/internal/internal/stack"
 )
 
-type CondensedNode struct {
+type condensedNode struct {
 	Next  map[int]struct{}
 	Nodes []rune
 }
@@ -13,11 +13,11 @@ type tarjanTraverser struct {
 	graph           map[rune]map[rune]struct{}
 	visited         map[rune]struct{}
 	compCount       int
-	s               stack.Stack
+	s               *stack.Stack
 	time            int
 	node2group      map[rune]int
 	group2component map[int]int
-	components      map[int]CondensedNode
+	components      map[int]condensedNode
 }
 
 func newTarjanTraverser(graph map[rune]map[rune]struct{}) tarjanTraverser {
@@ -25,15 +25,15 @@ func newTarjanTraverser(graph map[rune]map[rune]struct{}) tarjanTraverser {
 		graph:           graph,
 		visited:         make(map[rune]struct{}, len(graph)),
 		compCount:       0,
-		s:               stack.Stack{},
+		s:               stack.NewStack(),
 		time:            0,
 		node2group:      make(map[rune]int, len(graph)),
 		group2component: map[int]int{},
-		components:      map[int]CondensedNode{},
+		components:      map[int]condensedNode{},
 	}
 }
 
-func (t *tarjanTraverser) build() map[int]CondensedNode {
+func (t *tarjanTraverser) build() map[int]condensedNode {
 	for key := range t.visited {
 		t.node2group[key] = 0
 	}
@@ -64,7 +64,7 @@ func (t *tarjanTraverser) visit(p rune) {
 	}
 
 	t.group2component[t.node2group[p]] = t.compCount
-	condNode := CondensedNode{
+	condNode := condensedNode{
 		Next:  map[int]struct{}{},
 		Nodes: []rune{},
 	}
@@ -87,7 +87,7 @@ func (t *tarjanTraverser) visit(p rune) {
 	t.compCount++
 }
 
-func BuildCondensedGraph(graph map[rune]map[rune]struct{}) map[int]CondensedNode {
+func buildCondensedGraph(graph map[rune]map[rune]struct{}) map[int]condensedNode {
 	tr := newTarjanTraverser(graph)
 	return tr.build()
 }

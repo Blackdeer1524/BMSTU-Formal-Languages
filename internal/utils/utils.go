@@ -1,9 +1,5 @@
 package utils
 
-import (
-	"fmt"
-)
-
 // ExtractFirstRune extracts first rune from a given string
 func ExtractFirstRune(s string) rune {
 	var first rune
