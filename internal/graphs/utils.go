@@ -48,7 +48,9 @@ func TopoSort(deps map[rune]map[rune]struct{}) []rune {
 	res := make([]rune, 0)
 	for _, compIndex := range condSorted {
 		res = append(res, condGraph[compIndex].Nodes...)
-		res = append(res, condGraph[compIndex].Nodes...)
+		for i := 0; i < len(condGraph[compIndex].Nodes) - 1; i++ {
+			res = append(res, condGraph[compIndex].Nodes[i])
+		}
 	}
 
 	return res
