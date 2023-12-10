@@ -17,9 +17,10 @@ import (
 func ParseInput(
 	r *bufio.Reader,
 ) (info parsing.GrammarInfo) {
-	info.Productions = make(map[rune][]string)
 	info.Terms = make(map[rune]struct{})
 	info.Terms[parsing.EOS] = struct{}{}
+	info.Terms[parsing.EPSILON] = struct{}{}
+	info.Productions = make(map[rune][]string)
 
 	nonTerminalsStr, err := r.ReadString('\n')
 	if err != nil {
@@ -52,6 +53,8 @@ func ParseInput(
 				continue
 			} else if err == io.EOF {
 				return
+			} else {
+				panic(err)
 			}
 		}
 
@@ -113,13 +116,6 @@ func ParseInput(
 				info.Productions[varName],
 				rightProductions[i],
 			)
-		}
-
-		if err != nil {
-			if err == io.EOF {
-				return
-			}
-			panic(err)
 		}
 	}
 }

@@ -23,6 +23,7 @@ func TestEps(t *testing.T) {
 	}
 	info.Terms['a'] = struct{}{}
 	info.Terms['$'] = struct{}{}
+	info.Terms[EPSILON] = struct{}{}
 
 	info.Productions['S'] = []string{"aA$"}
 	info.Productions['A'] = []string{"B", "C"}
@@ -84,6 +85,7 @@ func TestFirst(t *testing.T) {
 	info.Terms['a'] = struct{}{}
 	info.Terms['b'] = struct{}{}
 	info.Terms['$'] = struct{}{}
+	info.Terms[EPSILON] = struct{}{}
 
 	info.Productions['S'] = []string{"aA$"}
 	info.Productions['A'] = []string{"B", "C"}
@@ -110,6 +112,7 @@ func TestFirstHard(t *testing.T) {
 	info.Terms['('] = struct{}{}
 	info.Terms[')'] = struct{}{}
 	info.Terms['$'] = struct{}{}
+	info.Terms[EPSILON] = struct{}{}
 
 	// E' = Q; T' = P
 	info.Productions['S'] = []string{"E$"}
@@ -153,6 +156,7 @@ func TestFollow(t *testing.T) {
 	info.Terms['('] = struct{}{}
 	info.Terms[')'] = struct{}{}
 	info.Terms['$'] = struct{}{}
+	info.Terms[EPSILON] = struct{}{}
 
 	// E' = Q; T' = P
 	info.Productions['S'] = []string{"E$"}

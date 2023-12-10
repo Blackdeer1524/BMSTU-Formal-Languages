@@ -2,7 +2,6 @@ package parsing
 
 import (
 	"fmt"
-	"unicode/utf8"
 
 	"LL1/internal/utils"
 )
@@ -45,17 +44,14 @@ func getEpsInfo(info GrammarInfo) (res map[rune]bool) {
 
 		isNullGenerating := false
 		for _, prod := range info.Productions[variable] {
-			if utf8.RuneCountInString(prod) == 1 &&
-				utils.ExtractFirstRune(prod) == EPSILON {
-				isNullGenerating = true
-				break
-			}
-
 			isEpsProduction := true
 			for _, c := range prod {
 				if _, ok := info.Terms[c]; ok {
+					if c == EPSILON {
+						continue
+					}
 					isEpsProduction = false
-					continue
+					break
 				}
 				isEpsProduction = isEpsProduction && visitVar(c)
 				if !isEpsProduction {
@@ -82,6 +78,7 @@ func getEpsInfo(info GrammarInfo) (res map[rune]bool) {
 	return res
 }
 
+// getFirstInfo provedes intem from FIRST set
 func getFirstInfo(
 	info GrammarInfo,
 	epsInfo map[rune]bool,
@@ -103,13 +100,11 @@ func getFirstInfo(
 			first[EPSILON] = struct{}{}
 		}
 		for _, prod := range info.Productions[nonterm] {
-			if utf8.RuneCountInString(prod) == 1 &&
-				utils.ExtractFirstRune(prod) == EPSILON {
-				continue
-			}
-
 			for _, c := range prod {
 				if _, ok := info.Terms[c]; ok {
+					if c == EPSILON {
+						continue
+					}
 					first[c] = struct{}{}
 					break
 				}
@@ -153,73 +148,26 @@ func getFollowInfo(
 		dependencies[variable] = make(map[rune]struct{})
 	}
 
-	c := make(chan rune)
-	done := make(chan struct{})
 	for v, prods := range info.Productions {
 		for _, prod := range prods {
-			if utf8.RuneCountInString(prod) == 1 {
-				f := utils.ExtractFirstRune(prod)
-				dependencies[f][v] = struct{}{}
-				continue
-			}
-
-			// 	go pairIter(prod, c, done)
-			// 	var f, s rune
-			// 	s = <-c
-			// 	suffixStart := 1
-			// L:
-			// 	for {
-			// 		f = s
-			// 		select {
-			// 		case s = <-c:
-			// 		case <-done:
-			// 			break L
-			// 		}
-			// 		suffixStart++
-			//
-			// 		if _, ok := info.Terms[f]; ok {
-			// 			continue
-			// 		}
-			//
-			// 		if _, ok := info.Terms[s]; ok {
-			// 			followSets[f][s] = struct{}{}
-			// 		} else {
-			// 			suffix := prod[suffixStart:]
-			// 			utils.MergeInPlace(followSets[f], tInfo(suffix, info.Terms, epsInfo, firstInfo))
-			//
-			// 			utils.MergeInPlace(followSets[f], firstInfo[s])
-			// 			delete(followSets[f], EPSILON)
-			//
-			// 			strInfo(prod[suffixStart:], info.Terms, epsInfo, firstInfo)
-			// 			if epsInfo[s] {
-			// 				dependencies[f][s] = struct{}{}
-			// 			}
-			// 		}
-			// 	}
-
-			for i, f := range prod {
-			}
-
-			for i := 0; i < len(prod)-1; i++ {
-				f, s = utils.ExtractPair(prod[i : i+2])
+			suffix := prod
+			for _, f := range prod {
+				suffix = suffix[1:]
 				if _, ok := info.Terms[f]; ok {
 					continue
 				}
-
-				if _, ok := info.Terms[s]; ok {
-					followSets[f][s] = struct{}{}
-				} else {
-					utils.MergeInPlace(followSets[f], firstInfo[s])
-					delete(followSets[f], EPSILON)
-
-					// strInfo(alpha string, terms map[rune]struct{}, epsInfo map[rune]bool, firstInfo map[rune]map[rune]struct{})
-					// if epsInfo[s] {
-					// 	dependencies[f][s] = struct{}{}
-					// }
+				suffixFrist := strInfo(suffix, info.Terms, epsInfo, firstInfo)
+				var producesEps bool
+				if _, ok := suffixFrist[EPSILON]; ok {
+					producesEps = true
 				}
-			}
-			if _, ok := info.Terms[s]; !ok {
-				dependencies[s][v] = struct{}{}
+				delete(suffixFrist, EPSILON)
+
+				utils.MergeInPlace(followSets[f], suffixFrist)
+				if producesEps {
+					dependencies[f][v] = struct{}{}
+				}
+
 			}
 		}
 	}
@@ -240,31 +188,29 @@ func strInfo(
 	terms map[rune]struct{},
 	epsInfo map[rune]bool,
 	firstInfo map[rune]map[rune]struct{},
-) (first map[rune]struct{}, eps bool) {
+) (first map[rune]struct{}) {
 	first = make(map[rune]struct{})
-	eps = false
+	first[EPSILON] = struct{}{}
 	if len(alpha) == 0 {
 		return
 	}
 
 	for _, c := range alpha {
 		if _, ok := terms[c]; ok {
+			if c == EPSILON {
+				continue
+			}
 			first[c] = struct{}{}
+			delete(first, EPSILON)
 			return
-		}
-		if c == EPSILON {
-			eps = true
-			continue
 		}
 
 		utils.MergeInPlace(first, firstInfo[c])
-		delete(first, EPSILON)
-
 		if !epsInfo[c] {
+			delete(first, EPSILON)
 			return
 		}
 	}
-	eps = true
 	return
 }
 
@@ -296,7 +242,12 @@ func BuildTable(info GrammarInfo) map[rune]map[rune]string {
 	for v, prods := range info.Productions {
 		for _, prod := range prods {
 			// https://web.cs.wpi.edu/~kal/PLT/PLT4.3.html
-			firstSet, eps := strInfo(prod, info.Terms, epsInfo, firstInfo)
+			firstSet := strInfo(prod, info.Terms, epsInfo, firstInfo)
+			var eps bool
+			if _, ok := firstSet[EPSILON]; ok {
+				eps = true
+			}
+			delete(firstSet, EPSILON)
 			for a := range firstSet {
 				if res[v][a] != "" {
 					panic("conflict found")

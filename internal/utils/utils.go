@@ -53,11 +53,15 @@ func TopoSort(dependencies map[rune]map[rune]struct{}) []rune {
 	topoVisit = func(v rune) {
 		if visited[v] == GREY {
 			panic(fmt.Sprintf("cyclic dependency found on var %c", v))
+		} else if visited[v] == BLACK {
+			return
 		}
 
 		visited[v] = GREY
 		for d := range dependencies[v] {
-			topoVisit(d)
+			if d != v {
+				topoVisit(d)
+			}
 			res = append(res, d)
 		}
 		res = append(res, v)
