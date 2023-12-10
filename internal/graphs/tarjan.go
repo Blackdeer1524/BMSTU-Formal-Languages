@@ -51,7 +51,7 @@ func (t *tarjanTraverser) visit(p rune) {
 	t.node2group[p] = tin
 
 	t.visited[p] = struct{}{}
-	for c := range t.graph {
+	for c := range t.graph[p] {
 		if _, ok := t.visited[c]; !ok {
 			t.time++
 			t.visit(c)
