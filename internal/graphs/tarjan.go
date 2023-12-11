@@ -1,62 +1,64 @@
 package graphs
 
 import (
-	"LL1/internal/internal/stack"
+	"LL1/internal/stack"
 )
 
 type condensedNode struct {
 	Next  map[int]struct{}
-	Nodes []rune
+	Nodes []string
 }
 
 type tarjanTraverser struct {
-	graph           map[rune]map[rune]struct{}
-	visited         map[rune]struct{}
+	graph           map[string]map[string]struct{}
+	visited         map[string]color
 	compCount       int
 	s               *stack.Stack
 	time            int
-	node2group      map[rune]int
+	node2group      map[string]int
 	group2component map[int]int
 	components      map[int]condensedNode
 }
 
-func newTarjanTraverser(graph map[rune]map[rune]struct{}) tarjanTraverser {
+func newTarjanTraverser(graph map[string]map[string]struct{}) tarjanTraverser {
 	return tarjanTraverser{
 		graph:           graph,
-		visited:         make(map[rune]struct{}, len(graph)),
+		visited:         make(map[string]color, len(graph)),
 		compCount:       0,
 		s:               stack.NewStack(),
 		time:            0,
-		node2group:      make(map[rune]int, len(graph)),
+		node2group:      make(map[string]int, len(graph)),
 		group2component: map[int]int{},
 		components:      map[int]condensedNode{},
 	}
 }
 
 func (t *tarjanTraverser) build() map[int]condensedNode {
-	for key := range t.visited {
+	for key := range t.graph {
+		t.visited[key] = white
 		t.node2group[key] = 0
 	}
 	for parent := range t.graph {
-		if _, ok := t.visited[parent]; !ok {
+		if t.visited[parent] == white {
 			t.visit(parent)
 		}
 	}
 	return t.components
 }
 
-func (t *tarjanTraverser) visit(p rune) {
+func (t *tarjanTraverser) visit(p string) {
+	t.time++
 	t.s.Push(p)
 	tin := t.time
 	t.node2group[p] = tin
 
-	t.visited[p] = struct{}{}
+	t.visited[p] = grey
 	for c := range t.graph[p] {
-		if _, ok := t.visited[c]; !ok {
-			t.time++
+		if t.visited[c] == white {
 			t.visit(c)
+		} else if t.visited[c] == grey {
+			t.node2group[p] = min(t.node2group[p], t.node2group[c])
 		}
-		t.node2group[p] = min(t.node2group[p], t.node2group[c])
 	}
 
 	if t.node2group[p] != tin {
@@ -66,10 +68,10 @@ func (t *tarjanTraverser) visit(p rune) {
 	t.group2component[t.node2group[p]] = t.compCount
 	condNode := condensedNode{
 		Next:  map[int]struct{}{},
-		Nodes: []rune{},
+		Nodes: []string{},
 	}
 	for {
-		top := t.s.Pop().(rune)
+		top := t.s.Pop().(string)
 		condNode.Nodes = append(condNode.Nodes, top)
 		for child := range t.graph[top] {
 			childComp := t.group2component[t.node2group[child]]
@@ -87,7 +89,7 @@ func (t *tarjanTraverser) visit(p rune) {
 	t.compCount++
 }
 
-func buildCondensedGraph(graph map[rune]map[rune]struct{}) map[int]condensedNode {
+func buildCondensedGraph(graph map[string]map[string]struct{}) map[int]condensedNode {
 	tr := newTarjanTraverser(graph)
 	return tr.build()
 }

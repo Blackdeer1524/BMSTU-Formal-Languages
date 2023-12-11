@@ -8,18 +8,18 @@ import (
 )
 
 type GrammarInfo struct {
-	Terms       map[rune]struct{}
-	Productions map[rune][]string
+	Terms       map[string]struct{}
+	Productions map[string][][]string
 }
 
 const (
-	EPSILON = 'ε'
-	EOS     = '$'
-	START   = 'S'
+	EPSILON = "ε"
+	EOS     = "$"
+	START   = "S"
 )
 
-func getEpsInfo(info GrammarInfo) (res map[rune]bool) {
-	res = make(map[rune]bool, len(info.Productions))
+func getEpsInfo(info GrammarInfo) (res map[string]bool) {
+	res = make(map[string]bool, len(info.Productions))
 
 	type color int
 	const (
@@ -27,24 +27,24 @@ func getEpsInfo(info GrammarInfo) (res map[rune]bool) {
 		GREY               // yet to finish processing
 		BLACK              // processed
 	)
-	visited := make(map[rune]color, len(info.Productions))
+	visited := make(map[string]color, len(info.Productions))
 
 	for key := range info.Productions {
 		res[key] = false
 		visited[key] = WHITE
 	}
 
-	var visitVar func(variable rune) bool
-	visitVar = func(variable rune) bool {
-		if visited[variable] == GREY {
+	var visitVar func(v string) bool
+	visitVar = func(v string) bool {
+		if visited[v] == GREY {
 			return true
-		} else if visited[variable] == BLACK {
-			return res[variable]
+		} else if visited[v] == BLACK {
+			return res[v]
 		}
-		visited[variable] = GREY
+		visited[v] = GREY
 
 		isNullGenerating := false
-		for _, prod := range info.Productions[variable] {
+		for _, prod := range info.Productions[v] {
 			isEpsProduction := true
 			for _, c := range prod {
 				if _, ok := info.Terms[c]; ok {
@@ -65,8 +65,8 @@ func getEpsInfo(info GrammarInfo) (res map[rune]bool) {
 				break
 			}
 		}
-		res[variable] = isNullGenerating
-		visited[variable] = BLACK
+		res[v] = isNullGenerating
+		visited[v] = BLACK
 		return isNullGenerating
 	}
 
@@ -82,71 +82,56 @@ func getEpsInfo(info GrammarInfo) (res map[rune]bool) {
 // getFirstInfo provedes intem from FIRST set
 func getFirstInfo(
 	info GrammarInfo,
-	epsInfo map[rune]bool,
-) map[rune]map[rune]struct{} {
-	res := make(map[rune]map[rune]struct{})
+	epsInfo map[string]bool,
+) map[string]map[string]struct{} {
+	res := make(map[string]map[string]struct{})
 
-	// NOTE: cyclic dependencies detection is needed, but who cares?
-	visited := make(map[rune]struct{})
+	dependencies := make(map[string]map[string]struct{})
+	for variable := range info.Productions {
+		res[variable] = map[string]struct{}{}
+		dependencies[variable] = make(map[string]struct{})
+	}
 
-	var varFirst func(nonterm rune)
-	varFirst = func(nonterm rune) {
-		if _, ok := visited[nonterm]; ok {
-			return
-		}
-		visited[nonterm] = struct{}{}
-
-		first := make(map[rune]struct{})
-		if epsInfo[nonterm] {
-			first[EPSILON] = struct{}{}
-		}
-		for _, prod := range info.Productions[nonterm] {
+	for v, prods := range info.Productions {
+		for _, prod := range prods {
 			for _, c := range prod {
 				if _, ok := info.Terms[c]; ok {
+					res[v][c] = struct{}{}
 					if c == EPSILON {
 						continue
 					}
-					first[c] = struct{}{}
 					break
 				}
 
-				varFirst(c)
-				for n := range res[c] {
-					first[n] = struct{}{}
-				}
-
+				dependencies[v][c] = struct{}{}
 				if !epsInfo[c] {
 					break
 				}
+
 			}
 		}
-		res[nonterm] = first
 	}
 
-	for variable := range info.Productions {
-		varFirst(variable)
+	order := graphs.TopoSort(dependencies)
+	for _, v := range order {
+		for dep := range dependencies[v] {
+			utils.MergeInPlace(res[v], res[dep])
+		}
 	}
 
 	return res
 }
 
-func pairIter(s string, c chan<- rune, done chan<- struct{}) {
-	for _, chr := range s {
-		c <- chr
-	}
-	done <- struct{}{}
-}
-
 func getFollowInfo(
 	info GrammarInfo,
-	epsInfo map[rune]bool,
-	firstInfo map[rune]map[rune]struct{},
-) map[rune]map[rune]struct{} {
-	followSets := make(map[rune]map[rune]struct{})
-	dependencies := make(map[rune]map[rune]struct{})
+	epsInfo map[string]bool,
+	firstInfo map[string]map[string]struct{},
+) map[string]map[string]struct{} {
+	followSets := make(map[string]map[string]struct{})
+	dependencies := make(map[string]map[string]struct{})
 	for variable := range info.Productions {
-		followSets[variable] = make(map[rune]struct{})
-		dependencies[variable] = make(map[rune]struct{})
+		followSets[variable] = make(map[string]struct{})
+		dependencies[variable] = make(map[string]struct{})
 	}
 
 	for v, prods := range info.Productions {
@@ -185,12 +170,12 @@ func getFollowInfo(
 }
 
 func strInfo(
-	alpha string,
-	terms map[rune]struct{},
-	epsInfo map[rune]bool,
-	firstInfo map[rune]map[rune]struct{},
-) (first map[rune]struct{}) {
-	first = make(map[rune]struct{})
+	alpha []string,
+	terms map[string]struct{},
+	epsInfo map[string]bool,
+	firstInfo map[string]map[string]struct{},
+) (first map[string]struct{}) {
+	first = make(map[string]struct{})
 	if len(alpha) == 0 {
 		return
 	}
@@ -223,20 +208,21 @@ func printFirstTable(first map[rune]map[rune]struct{}) {
 	}
 }
 
+type Table = map[string]map[string][]string
+
 // BuildTable builds a table for LL(1) parser
 //
 // Table = Variables x Terminals
-func BuildTable(info GrammarInfo) map[rune]map[rune]string {
+func BuildTable(info GrammarInfo) Table {
 	epsInfo := getEpsInfo(info)
 	firstInfo := getFirstInfo(info, epsInfo)
-	printFirstTable(firstInfo)
 	followInfo := getFollowInfo(info, epsInfo, firstInfo)
 
-	res := make(map[rune]map[rune]string, len(info.Productions))
+	res := make(Table, len(info.Productions))
 	for v := range info.Productions {
-		res[v] = make(map[rune]string, len(info.Terms))
+		res[v] = make(map[string][]string, len(info.Terms))
 		for t := range info.Terms {
-			res[v][t] = ""
+			res[v][t] = []string{}
 		}
 	}
 
@@ -250,17 +236,17 @@ func BuildTable(info GrammarInfo) map[rune]map[rune]string {
 			}
 			delete(firstSet, EPSILON)
 			for a := range firstSet {
-				if res[v][a] != "" {
+				if len(res[v][a]) != 0 {
 					panic("conflict found")
 				}
 				res[v][a] = prod
 			}
 			if eps {
 				if _, ok := firstSet[EOS]; ok {
-					res[v][EOS] = string(EPSILON)
+					res[v][EOS] = append(res[v][EOS], EPSILON)
 				} else {
 					for b := range followInfo[v] {
-						res[v][b] = string(EPSILON)
+						res[v][b] = append(res[v][b], EPSILON)
 					}
 				}
 			}

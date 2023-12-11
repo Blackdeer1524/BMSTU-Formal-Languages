@@ -23,7 +23,7 @@ func ExtractPair(str string) (f rune, s rune) {
 }
 
 // MergeInPlace merges two sets together
-func MergeInPlace(dst map[rune]struct{}, src map[rune]struct{}) {
+func MergeInPlace(dst map[string]struct{}, src map[string]struct{}) {
 	for key := range src {
 		dst[key] = struct{}{}
 	}

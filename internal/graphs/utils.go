@@ -11,7 +11,7 @@ const (
 )
 
 // TopoSort sorts topologically given dependecies graph
-func TopoSort(deps map[rune]map[rune]struct{}) []rune {
+func TopoSort(deps map[string]map[string]struct{}) []string {
 	condGraph := buildCondensedGraph(deps)
 
 	visited := make(map[int]color)
@@ -35,7 +35,6 @@ func TopoSort(deps map[rune]map[rune]struct{}) []rune {
 			condSorted = append(condSorted, d)
 		}
 		condSorted = append(condSorted, v)
-
 		visited[v] = black
 	}
 
@@ -45,10 +44,10 @@ func TopoSort(deps map[rune]map[rune]struct{}) []rune {
 		}
 	}
 
-	res := make([]rune, 0)
+	res := make([]string, 0)
 	for _, compIndex := range condSorted {
 		res = append(res, condGraph[compIndex].Nodes...)
-		for i := 0; i < len(condGraph[compIndex].Nodes) - 1; i++ {
+		for i := 0; i < len(condGraph[compIndex].Nodes)-1; i++ {
 			res = append(res, condGraph[compIndex].Nodes[i])
 		}
 	}
