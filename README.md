@@ -23,5 +23,5 @@ go mod tidy
 
 # Запуск
 ```
-go run cmd/cli/main.go
+STRAT=greedy go run cmd/cli/main.go
 ```

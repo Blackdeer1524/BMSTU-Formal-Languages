@@ -17,6 +17,20 @@ func main() {
 		panic(err)
 	}
 
+	stratStr := os.Getenv("STRAT")
+	if len(stratStr) == 0 {
+		panic("expected STRAT environment variable")
+	}
+
+	var strat bool
+	if stratStr == "simple" {
+		strat = false
+	} else if stratStr == "greedy" {
+		strat = true
+	} else {
+		panic(fmt.Sprintf("unknown strategy: ", stratStr))
+	}
+
 	reader := bufio.NewReader(f)
 	w0, w1, info := input.ParseInput(reader)
 	table := parsing.BuildTable(info)
@@ -24,7 +38,7 @@ func main() {
 	p := parsing.NewLL1Parser(table, info.Terms)
 
 	T0 := p.BuildTree(w0)
-	T1 := parsing.Incremental(w0, T0, w1, info, true)
+	T1 := parsing.Incremental(w0, T0, w1, info, strat)
 
 	fmt.Println("T0: ", T0.Debug())
 	fmt.Println("T1: ", T1.Debug())
