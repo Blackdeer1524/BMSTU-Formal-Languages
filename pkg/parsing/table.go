@@ -190,6 +190,7 @@ func strInfo(
 		}
 
 		utils.MergeInPlace(first, firstInfo[c])
+		delete(first, EPSILON)
 		if !epsInfo[c] {
 			return
 		}
