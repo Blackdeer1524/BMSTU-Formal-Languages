@@ -25,14 +25,14 @@ func TopoSort(deps map[string]map[string]struct{}) []string {
 	topoVisit = func(v int) {
 		if visited[v] == grey {
 			panic(fmt.Sprintf("cyclic dependency found on var %c", v))
-		} else if visited[v] == black {
-			return
 		}
 
 		visited[v] = grey
 		for d := range condGraph[v].Next {
-			topoVisit(d)
-			condSorted = append(condSorted, d)
+			if visited[d] != black {
+				topoVisit(d)
+				condSorted = append(condSorted, d)
+			}
 		}
 		condSorted = append(condSorted, v)
 		visited[v] = black

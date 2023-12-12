@@ -56,10 +56,12 @@ func (t *tarjanTraverser) visit(p string) {
 	for c := range t.graph[p] {
 		if t.visited[c] == white {
 			t.visit(c)
+			t.node2group[p] = min(t.node2group[p], t.node2group[c])
 		} else if t.visited[c] == grey {
 			t.node2group[p] = min(t.node2group[p], t.node2group[c])
 		}
 	}
+	t.visited[p] = black
 
 	if t.node2group[p] != tin {
 		return
