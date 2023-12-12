@@ -59,6 +59,16 @@ func (n *Node) findPos(pos int) *Node {
 	return res
 }
 
+func (n *Node) fixPos(e int) {
+	if n.pos == UNDEFINED {
+		return
+	}
+	n.pos -= e
+	for _, c := range n.children {
+		c.fixPos(e)
+	}
+}
+
 func (n *Node) rightSibling() *Node {
 	if n.parent == nil {
 		return nil
@@ -106,6 +116,9 @@ func (p *LL1Parser) BuildTree(w string) *Node {
 func (p *LL1Parser) BuildTreeIncremental(s string, lastParsedPos int, n int, d *deque.Deque[*Node]) {
 	if len(s) == 0 {
 		panic("cannot parse empty string")
+	}
+	if n == 0 {
+		return
 	}
 
 	p.d = d
@@ -167,10 +180,14 @@ func (n *Node) deduceNodePosition() int {
 	return res
 }
 
-func CopyUntil(pos int, c *Node, p *Node, d *deque.Deque[*Node]) *Node {
-	if pos == 0 {
+func CopyUntil(pos int, root *Node, d *deque.Deque[*Node]) *Node {
+	if pos <= 0 {
 		return nil
 	}
+	return copyUntilHelper(pos, root, nil, d)
+}
+
+func copyUntilHelper(pos int, c *Node, p *Node, d *deque.Deque[*Node]) *Node {
 	n := &Node{
 		name:     c.name,
 		parent:   p,
@@ -185,13 +202,13 @@ func CopyUntil(pos int, c *Node, p *Node, d *deque.Deque[*Node]) *Node {
 	}
 
 	for _, grandChild := range c.children {
-		n.children = append(n.children, CopyUntil(pos, grandChild, n, d))
+		n.children = append(n.children, copyUntilHelper(pos, grandChild, n, d))
 	}
 
 	return n
 }
 
-func foo(w0 string, w1 string, info GrammarInfo, greedy bool) *Node {
+func Incremental(w0 string, T0 *Node, w1 string, info GrammarInfo, greedy bool) *Node {
 	t := BuildTable(info)
 	p := newLL1Parser(t, info.Terms)
 
@@ -217,26 +234,33 @@ func foo(w0 string, w1 string, info GrammarInfo, greedy bool) *Node {
 		j--
 	}
 
-	T0 := p.BuildTree(w0)
 	NmPos := len(w0) - zLen + 1
 	Nm := T0.findPos(NmPos)
 
-	T1 := CopyUntil(xLen, T0, nil, p.d)
+	var T1 *Node
+	if xLen == 0 {
+		T1 = NewNode("S", nil)
+		p.d.PushBack(T1)
+	} else {
+		T1 = CopyUntil(xLen, T0, p.d)
+	}
 
 	NmPrimePos := len(w1) - zLen + 1
 	nToParse := len(w1) - xLen - zLen + 1
 	w1 = w1[xLen:]
-	offset := xLen
-	for {
-		p.BuildTreeIncremental(w1, offset, nToParse, p.d)
+	lastParsedPos := xLen
+	for len(w1) != 0 {
+		p.BuildTreeIncremental(w1, lastParsedPos, nToParse, p.d)
+		lastParsedPos += nToParse
+
 		T1Str := T1.String()
 		fmt.Println(T1Str)
 
-		offset += nToParse
-		if offset == len(w1) {
+		if nToParse == len(w1) {
 			break
+		} else {
+			w1 = w1[nToParse:]
 		}
-		w1 = w1[nToParse:]
 
 		NmPrime := T1.findPos(NmPrimePos)
 		NmPrimeStr := NmPrime.String()
@@ -244,14 +268,30 @@ func foo(w0 string, w1 string, info GrammarInfo, greedy bool) *Node {
 
 		oldNmPos := Nm.pos
 		if Nm.name == NmPrime.name {
-			NmCopy := CopyUntil(math.MaxInt, Nm, nil, nil)
+			NmCopy := CopyUntil(math.MaxInt, Nm, nil)
+
 			NmPrime.parent.children[NmPrime.index] = NmCopy
+			NmCopy.parent = NmPrime.parent
+			NmCopy.index = NmPrime.index
+
+			posErr := NmCopy.pos - NmPrime.pos
+			NmCopy.fixPos(posErr)
 
 			Nm = Nm.rightSibling()
+			if Nm == nil {
+				nToParse = len(w1)
+				NmPrimePos += nToParse
+				NmPos += nToParse
+			} else {
+				nToParse = Nm.pos - oldNmPos
+				NmPrimePos += nToParse
+				NmPos += nToParse
+			}
 
-			nToParse = Nm.pos - oldNmPos
-			NmPrimePos += nToParse
-			NmPos += nToParse
+			nPasted := Nm.pos - oldNmPos
+			nToParse = 0
+			NmPrimePos += nPasted
+			NmPos += nPasted
 		} else {
 			if greedy {
 				Nm = Nm.rightSibling()
@@ -264,11 +304,10 @@ func foo(w0 string, w1 string, info GrammarInfo, greedy bool) *Node {
 					NmPrimePos += nToParse
 					NmPos += nToParse
 				}
-
 			} else {
+				nToParse = 1
 				NmPrimePos++
 				NmPos++
-				nToParse = 1
 				Nm = T0.findPos(NmPos)
 			}
 		}
