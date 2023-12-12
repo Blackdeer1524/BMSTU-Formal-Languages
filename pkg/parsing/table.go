@@ -249,7 +249,7 @@ func BuildTable(info GrammarInfo) Table {
 			delete(firstSet, EPSILON)
 			for a := range firstSet {
 				if len(res[v][a]) != 0 {
-					panic("conflict found")
+					panic("provided grammar is NOT LL(1)")
 				}
 				res[v][a] = prod
 			}
