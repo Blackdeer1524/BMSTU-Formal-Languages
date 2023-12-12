@@ -1,6 +1,5 @@
 package parsing
 
-
 import (
 	"fmt"
 	"math"
@@ -36,10 +35,10 @@ func NewNode(name string, p *Node) *Node {
 	}
 }
 
-func (n *Node) String() string {
+func (n *Node) Debug() string {
 	var builder strings.Builder
 	for _, c := range n.children {
-		builder.WriteString(c.String())
+		builder.WriteString(c.Debug())
 	}
 	return fmt.Sprintf("(%s[%d,%d]:%s)", n.name, n.pos, n.index, builder.String())
 }
@@ -215,10 +214,14 @@ func Incremental(w0 string, T0 *Node, w1 string, info GrammarInfo, greedy bool) 
 
 	rw0 := []rune(w0)
 	rw1 := []rune(w1)
-
 	xLen := 0
+	fullMatch := true
 	for xLen = range rw0 {
+		if xLen == len(rw1) {
+			break
+		}
 		if rw0[xLen] != rw1[xLen] {
+			fullMatch = false
 			break
 		}
 	}
@@ -226,17 +229,16 @@ func Incremental(w0 string, T0 *Node, w1 string, info GrammarInfo, greedy bool) 
 	i := len(rw0) - 1
 	j := len(rw1) - 1
 	zLen := 0
-	for i >= 0 && j >= 0 {
-		if rw0[i] != rw1[j] {
-			break
+	if !fullMatch {
+		for i >= 0 && j >= 0 {
+			if rw0[i] != rw1[j] {
+				break
+			}
+			zLen++
+			i--
+			j--
 		}
-		zLen++
-		i--
-		j--
 	}
-
-	NmPos := len(w0) - zLen + 1
-	Nm := T0.findPos(NmPos)
 
 	var T1 *Node
 	if xLen == 0 {
@@ -246,26 +248,30 @@ func Incremental(w0 string, T0 *Node, w1 string, info GrammarInfo, greedy bool) 
 		T1 = CopyUntil(xLen, T0, p.d)
 	}
 
+	NmPos := len(w0) - zLen + 1
+	Nm := T0.findPos(NmPos)
+
 	NmPrimePos := len(w1) - zLen + 1
 	nToParse := len(w1) - xLen - zLen + 1
-	w1 = w1[xLen:]
+	w1 = fmt.Sprintf("%s$", w1[xLen:]) 
 	lastParsedPos := xLen
-	for len(w1) != 0 {
+	for {
 		p.BuildTreeIncremental(w1, lastParsedPos, nToParse, p.d)
 		lastParsedPos += nToParse
 
-		T1Str := T1.String()
-		fmt.Println(T1Str)
+		// T1Str := T1.Debug()
+		// fmt.Println(T1Str)
 
-		if nToParse == len(w1) + 1 {
+		if nToParse >= len(w1) {
 			break
 		} else {
 			w1 = w1[nToParse:]
 		}
 
 		NmPrime := T1.findPos(NmPrimePos)
-		NmPrimeStr := NmPrime.String()
-		fmt.Println(NmPrimeStr)
+
+		// NmPrimeStr := NmPrime.Debug()
+		// fmt.Println(NmPrimeStr)
 
 		oldNmPos := Nm.pos
 		if Nm.name == NmPrime.name {
