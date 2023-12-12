@@ -22,10 +22,10 @@ func TestEps(t *testing.T) {
 		Productions: map[string][][]string{},
 	}
 	info.Terms["a"] = struct{}{}
-	info.Terms["$"] = struct{}{}
+	info.Terms[EOS] = struct{}{}
 	info.Terms[EPSILON] = struct{}{}
 
-	info.Productions["S"] = [][]string{{"a", "A", "$"}}
+	info.Productions["S"] = [][]string{{"a", "A", EOS}}
 	info.Productions["A"] = [][]string{{"B"}, {"C"}}
 	info.Productions["B"] = [][]string{{"B", "a"}, {EPSILON}}
 	info.Productions["C"] = [][]string{{"a"}}
@@ -90,10 +90,10 @@ func TestFirst(t *testing.T) {
 	}
 	info.Terms["a"] = struct{}{}
 	info.Terms["b"] = struct{}{}
-	info.Terms["$"] = struct{}{}
+	info.Terms[EOS] = struct{}{}
 	info.Terms[EPSILON] = struct{}{}
 
-	info.Productions["S"] = [][]string{{"a", "A", "$"}}
+	info.Productions["S"] = [][]string{{"a", "A", EOS}}
 	info.Productions["A"] = [][]string{{"B"}, {"C"}}
 	info.Productions["B"] = [][]string{{"B", "a"}, {EPSILON}}
 	info.Productions["C"] = [][]string{{"b"}}
@@ -132,11 +132,11 @@ func TestFirstHard(t *testing.T) {
 	info.Terms["a"] = struct{}{}
 	info.Terms["("] = struct{}{}
 	info.Terms[")"] = struct{}{}
-	info.Terms["$"] = struct{}{}
+	info.Terms[EOS] = struct{}{}
 	info.Terms[EPSILON] = struct{}{}
 
 	// E' = Q; T' = P
-	info.Productions["S"] = [][]string{{"E", "$"}}
+	info.Productions["S"] = [][]string{{"E", EOS}}
 	info.Productions["E"] = [][]string{{"T", "Q"}}
 	info.Productions["Q"] = [][]string{{"+", "T", "Q"}, {EPSILON}}
 	info.Productions["T"] = [][]string{{"F", "P"}}
@@ -207,11 +207,11 @@ func TestFollow(t *testing.T) {
 	info.Terms["a"] = struct{}{}
 	info.Terms["("] = struct{}{}
 	info.Terms[")"] = struct{}{}
-	info.Terms["$"] = struct{}{}
+	info.Terms[EOS] = struct{}{}
 	info.Terms[EPSILON] = struct{}{}
 
 	// E' = Q; T' = P
-	info.Productions["S"] = [][]string{{"E", "$"}}
+	info.Productions["S"] = [][]string{{"E", EOS}}
 	info.Productions["E"] = [][]string{{"T", "Q"}}
 	info.Productions["Q"] = [][]string{{"+", "T", "Q"}, {EPSILON}}
 	info.Productions["T"] = [][]string{{"F", "P"}}
@@ -237,31 +237,31 @@ func TestFollow(t *testing.T) {
 	res := getFollowInfo(info, epsInfo, firstInfo)
 
 	{
-		err := testFollowHelper(res, "E", 2, []string{"$", ")"})
+		err := testFollowHelper(res, "E", 2, []string{EOS, ")"})
 		if err != nil {
 			t.Error(err.Error())
 		}
 	}
 	{
-		err := testFollowHelper(res, "Q", 2, []string{"$", ")"})
+		err := testFollowHelper(res, "Q", 2, []string{EOS, ")"})
 		if err != nil {
 			t.Error(err.Error())
 		}
 	}
 	{
-		err := testFollowHelper(res, "T", 3, []string{"+", "$", ")"})
+		err := testFollowHelper(res, "T", 3, []string{"+", EOS, ")"})
 		if err != nil {
 			t.Error(err.Error())
 		}
 	}
 	{
-		err := testFollowHelper(res, "P", 3, []string{"+", "$", ")"})
+		err := testFollowHelper(res, "P", 3, []string{"+", EOS, ")"})
 		if err != nil {
 			t.Error(err.Error())
 		}
 	}
 	{
-		err := testFollowHelper(res, "F", 4, []string{"+", "*", "$", ")"})
+		err := testFollowHelper(res, "F", 4, []string{"+", "*", EOS, ")"})
 		if err != nil {
 			t.Error(err.Error())
 		}
@@ -286,11 +286,11 @@ func TestTable(t *testing.T) {
 	info.Terms["a"] = struct{}{}
 	info.Terms["("] = struct{}{}
 	info.Terms[")"] = struct{}{}
-	info.Terms["$"] = struct{}{}
+	info.Terms[EOS] = struct{}{}
 	info.Terms[EPSILON] = struct{}{}
 
 	// E' = Q; T' = P
-	info.Productions["S"] = [][]string{{"E", "$"}}
+	info.Productions["S"] = [][]string{{"E", EOS}}
 	info.Productions["E"] = [][]string{{"T", "Q"}}
 	info.Productions["Q"] = [][]string{{"+", "T", "Q"}, {EPSILON}}
 	info.Productions["T"] = [][]string{{"F", "P"}}
@@ -302,9 +302,9 @@ func TestTable(t *testing.T) {
 	// E' = Q; T' = P
 	exp := map[string]map[string][]string{
 		"E": {"i": {"T", "Q"}, "(": {"T", "Q"}},
-		"Q": {"+": {"+", "T", "Q"}, ")": {"ε"}, "$": {"ε"}},
+		"Q": {"+": {"+", "T", "Q"}, ")": {"ε"}, EOS: {"ε"}},
 		"T": {"i": {"F", "P"}, "(": {"F", "P"}},
-		"P": {"+": {"ε"}, "*": {"*", "F", "P"}, ")": {"ε"}, "$": {"ε"}},
+		"P": {"+": {"ε"}, "*": {"*", "F", "P"}, ")": {"ε"}, EOS: {"ε"}},
 		"F": {"i": {"i"}, "(": {"(", "E", ")"}},
 	}
 	for v, row := range exp {

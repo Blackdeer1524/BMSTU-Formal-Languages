@@ -2,6 +2,7 @@ package parsing
 
 import (
 	"fmt"
+	"math"
 
 	"LL1/internal/graphs"
 	"LL1/internal/utils"
@@ -24,7 +25,7 @@ func NewGrammarInfo() GrammarInfo {
 
 const (
 	EPSILON = "ε"
-	EOS     = "$"
+	EOS     = string(rune(math.MaxInt32))
 	START   = "S"
 )
 

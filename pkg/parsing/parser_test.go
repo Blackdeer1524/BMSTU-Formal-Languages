@@ -11,11 +11,11 @@ func grammarInfoFixture() GrammarInfo {
 			"a":     {},
 			"(":     {},
 			")":     {},
-			"$":     {},
+			EOS:     {},
 			EPSILON: {},
 		},
 		Productions: map[string][][]string{
-			"S": {{"E", "$"}},
+			"S": {{"E", EOS}},
 			"E": {{"T", "Q"}},
 			"Q": {{"+", "T", "Q"}, {EPSILON}},
 			"T": {{"F", "P"}},
@@ -25,7 +25,7 @@ func grammarInfoFixture() GrammarInfo {
 	}
 
 	// E' = Q; T' = P
-	info.Productions["S"] = [][]string{{"E", "$"}}
+	info.Productions["S"] = [][]string{{"E", EOS}}
 	info.Productions["E"] = [][]string{{"T", "Q"}}
 	info.Productions["Q"] = [][]string{{"+", "T", "Q"}, {EPSILON}}
 	info.Productions["T"] = [][]string{{"F", "P"}}
@@ -44,7 +44,7 @@ func TestNotInLang(t *testing.T) {
 
 	info := grammarInfoFixture()
 	table := BuildTable(info)
-	p := newLL1Parser(table, info.Terms)
+	p := NewLL1Parser(table, info.Terms)
 
 	p.BuildTree("i+i+")
 
@@ -59,7 +59,7 @@ func TestSimple(t *testing.T) {
 	w1 := "i*i+i+i"
 
 	table := BuildTable(info)
-	p := newLL1Parser(table, info.Terms)
+	p := NewLL1Parser(table, info.Terms)
 
 	T0 := p.BuildTree(w0)
 
@@ -81,7 +81,7 @@ func TestEmptyPrefix(t *testing.T) {
 	w1 := "i+i+i+i"
 
 	table := BuildTable(info)
-	p := newLL1Parser(table, info.Terms)
+	p := NewLL1Parser(table, info.Terms)
 
 	T0 := p.BuildTree(w0)
 
@@ -103,7 +103,7 @@ func TestEmptySuffixW0(t *testing.T) {
 	w1 := "i+i+i+i"
 
 	table := BuildTable(info)
-	p := newLL1Parser(table, info.Terms)
+	p := NewLL1Parser(table, info.Terms)
 
 	T0 := p.BuildTree(w0)
 
@@ -125,7 +125,7 @@ func TestEmptySuffixW1(t *testing.T) {
 	w1 := "i+i"
 
 	table := BuildTable(info)
-	p := newLL1Parser(table, info.Terms)
+	p := NewLL1Parser(table, info.Terms)
 
 	T0 := p.BuildTree(w0)
 

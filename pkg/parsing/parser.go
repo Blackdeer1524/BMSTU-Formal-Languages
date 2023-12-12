@@ -5,6 +5,8 @@ import (
 	"math"
 	"strings"
 
+	"LL1/internal/utils"
+
 	"github.com/gammazero/deque"
 )
 
@@ -87,7 +89,7 @@ func propogatePosition(n *Node, p int) {
 	}
 }
 
-func newLL1Parser(t Table, terms map[string]struct{}) LL1Parser {
+func NewLL1Parser(t Table, terms map[string]struct{}) LL1Parser {
 	p := LL1Parser{
 		table: t,
 		terms: terms,
@@ -100,7 +102,7 @@ func iterString(s string, c chan<- rune) {
 	for _, chr := range s {
 		c <- chr
 	}
-	c <- '$'
+	c <- utils.ExtractFirstRune(EOS)
 }
 
 func (p *LL1Parser) BuildTree(w string) *Node {
@@ -210,7 +212,7 @@ func copyUntilHelper(pos int, c *Node, p *Node, d *deque.Deque[*Node]) *Node {
 
 func Incremental(w0 string, T0 *Node, w1 string, info GrammarInfo, greedy bool) *Node {
 	t := BuildTable(info)
-	p := newLL1Parser(t, info.Terms)
+	p := NewLL1Parser(t, info.Terms)
 
 	rw0 := []rune(w0)
 	rw1 := []rune(w1)
@@ -253,7 +255,7 @@ func Incremental(w0 string, T0 *Node, w1 string, info GrammarInfo, greedy bool) 
 
 	NmPrimePos := len(w1) - zLen + 1
 	nToParse := len(w1) - xLen - zLen + 1
-	w1 = fmt.Sprintf("%s$", w1[xLen:]) 
+	w1 = fmt.Sprintf("%s%s", w1[xLen:], EOS)
 	lastParsedPos := xLen
 	for {
 		p.BuildTreeIncremental(w1, lastParsedPos, nToParse, p.d)
