@@ -12,6 +12,16 @@ type GrammarInfo struct {
 	Productions map[string][][]string
 }
 
+func NewGrammarInfo() GrammarInfo {
+	return GrammarInfo{
+		Terms: map[string]struct{}{
+			EOS:     {},
+			EPSILON: {},
+		},
+		Productions: map[string][][]string{},
+	}
+}
+
 const (
 	EPSILON = "ε"
 	EOS     = "$"
