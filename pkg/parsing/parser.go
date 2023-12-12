@@ -1,5 +1,6 @@
 package parsing
 
+
 import (
 	"fmt"
 	"math"
@@ -256,7 +257,7 @@ func Incremental(w0 string, T0 *Node, w1 string, info GrammarInfo, greedy bool) 
 		T1Str := T1.String()
 		fmt.Println(T1Str)
 
-		if nToParse == len(w1) {
+		if nToParse == len(w1) + 1 {
 			break
 		} else {
 			w1 = w1[nToParse:]
@@ -287,11 +288,6 @@ func Incremental(w0 string, T0 *Node, w1 string, info GrammarInfo, greedy bool) 
 				NmPrimePos += nToParse
 				NmPos += nToParse
 			}
-
-			nPasted := Nm.pos - oldNmPos
-			nToParse = 0
-			NmPrimePos += nPasted
-			NmPos += nPasted
 		} else {
 			if greedy {
 				Nm = Nm.rightSibling()

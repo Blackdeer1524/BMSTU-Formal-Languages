@@ -32,5 +32,22 @@ func TestParser(t *testing.T) {
 	info.Productions["P"] = [][]string{{"*", "F", "P"}, {EPSILON}}
 	info.Productions["F"] = [][]string{{"i"}, {"(", "E", ")"}}
 
-	foo("i+i+i+i", "i*i+i+i", info, true)
+	w0 := "i+i+i+i"
+	w1 := "i*i+i+i"
+
+	table := BuildTable(info)
+	p := newLL1Parser(table, info.Terms)
+
+	T0 := p.BuildTree(w0)
+
+	T1 := Incremental(w0, T0, w1, info, true)
+	T1IncDebug := T1.Debug()
+
+	T1Full := p.BuildTree(w1)
+	T1FullDebug := T1Full.Debug()
+
+	if T1FullDebug != T1IncDebug {
+		t.Fatalf("incremental & full trees don't match: %s | %s", T1IncDebug, T1FullDebug)
+	}
+	
 }
