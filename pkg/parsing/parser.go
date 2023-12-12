@@ -1,7 +1,9 @@
 package parsing
 
 import (
+	"fmt"
 	"math"
+	"strings"
 
 	"github.com/gammazero/deque"
 )
@@ -33,6 +35,14 @@ func NewNode(name string, p *Node) *Node {
 	}
 }
 
+func (n *Node) String() string {
+	var builder strings.Builder
+	for _, c := range n.children {
+		builder.WriteString(c.String())
+	}
+	return fmt.Sprintf("(%s[%d,%d]:%s)", n.name, n.pos, n.index, builder.String())
+}
+
 func (n *Node) findPos(pos int) *Node {
 	if n.pos == pos {
 		return n
@@ -42,7 +52,7 @@ func (n *Node) findPos(pos int) *Node {
 	var res *Node = nil
 	for _, c := range n.children {
 		res = c.findPos(pos)
-		if res != nil {
+		if res != nil && !(len(res.children) == 1 && res.children[0].name == EPSILON) {
 			break
 		}
 	}
@@ -110,7 +120,7 @@ func (p *LL1Parser) BuildTreeIncremental(s string, lastParsedPos int, n int, d *
 		front := p.d.PopFront()
 		if _, ok := p.terms[front.name]; ok {
 			if front.name != EPSILON {
-				propogatePosition(front, i + lastParsedPos)
+				propogatePosition(front, i+lastParsedPos)
 				i++
 				if front.name == EOS {
 					break
@@ -149,10 +159,12 @@ func (n *Node) deduceNodePosition() int {
 		return n.pos
 	}
 	right := n.rightSibling()
-	if right != nil {
-		n.pos = right.deduceNodePosition()
+	if right == nil {
+		return UNDEFINED
 	}
-	return n.pos
+	res := right.deduceNodePosition()
+	propogatePosition(n, res)
+	return res
 }
 
 func CopyUntil(pos int, c *Node, p *Node, d *deque.Deque[*Node]) *Node {
@@ -167,6 +179,7 @@ func CopyUntil(pos int, c *Node, p *Node, d *deque.Deque[*Node]) *Node {
 		index:    c.index,
 	}
 	if c.pos > pos || c.pos == UNDEFINED {
+		n.pos = UNDEFINED
 		d.PushBack(n)
 		return n
 	}
@@ -207,19 +220,29 @@ func foo(w0 string, w1 string, info GrammarInfo, greedy bool) *Node {
 	T0 := p.BuildTree(w0)
 	NmPos := len(w0) - zLen + 1
 	Nm := T0.findPos(NmPos)
-	oldNmPos := Nm.pos
 
 	T1 := CopyUntil(xLen, T0, nil, p.d)
+
 	NmPrimePos := len(w1) - zLen + 1
 	nToParse := len(w1) - xLen - zLen + 1
 	w1 = w1[xLen:]
 	offset := xLen
 	for {
 		p.BuildTreeIncremental(w1, offset, nToParse, p.d)
+		T1Str := T1.String()
+		fmt.Println(T1Str)
+
 		offset += nToParse
+		if offset == len(w1) {
+			break
+		}
 		w1 = w1[nToParse:]
 
 		NmPrime := T1.findPos(NmPrimePos)
+		NmPrimeStr := NmPrime.String()
+		fmt.Println(NmPrimeStr)
+
+		oldNmPos := Nm.pos
 		if Nm.name == NmPrime.name {
 			NmCopy := CopyUntil(math.MaxInt, Nm, nil, nil)
 			NmPrime.parent.children[NmPrime.index] = NmCopy
@@ -233,8 +256,7 @@ func foo(w0 string, w1 string, info GrammarInfo, greedy bool) *Node {
 			if greedy {
 				Nm = Nm.rightSibling()
 				if Nm == nil {
-					panic("???")
-					nToParse = len(w0) - oldNmPos
+					nToParse = len(w1)
 					NmPrimePos += nToParse
 					NmPos += nToParse
 				} else {
