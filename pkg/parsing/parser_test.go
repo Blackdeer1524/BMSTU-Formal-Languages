@@ -139,3 +139,90 @@ func TestEmptySuffixW1(t *testing.T) {
 		t.Fatalf("incremental & full trees don't match: %s | %s", T1IncDebug, T1FullDebug)
 	}
 }
+
+func TestSimpleSimple(t *testing.T) {
+	info := grammarInfoFixture()
+	w0 := "i+i+i+i"
+	w1 := "i*i+i+i"
+
+	table := BuildTable(info)
+	p := NewLL1Parser(table, info.Terms)
+
+	T0 := p.BuildTree(w0)
+
+	T1 := Incremental(w0, T0, w1, info, false)
+	T1IncDebug := T1.Debug()
+
+	T1Full := p.BuildTree(w1)
+	T1FullDebug := T1Full.Debug()
+
+	if T1FullDebug != T1IncDebug {
+		t.Fatalf("incremental & full trees don't match: %s | %s", T1IncDebug, T1FullDebug)
+	}
+}
+
+func TestEmptyPrefixSimple(t *testing.T) {
+	info := grammarInfoFixture()
+
+	w0 := "(i+i)+i+i"
+	w1 := "i+i+i+i"
+
+	table := BuildTable(info)
+	p := NewLL1Parser(table, info.Terms)
+
+	T0 := p.BuildTree(w0)
+
+	T1 := Incremental(w0, T0, w1, info, false)
+	T1IncDebug := T1.Debug()
+
+	T1Full := p.BuildTree(w1)
+	T1FullDebug := T1Full.Debug()
+
+	if T1FullDebug != T1IncDebug {
+		t.Fatalf("incremental & full trees don't match: %s | %s", T1IncDebug, T1FullDebug)
+	}
+}
+
+func TestEmptySuffixW0Simple(t *testing.T) {
+	info := grammarInfoFixture()
+
+	w0 := "i+i"
+	w1 := "i+i+i+i"
+
+	table := BuildTable(info)
+	p := NewLL1Parser(table, info.Terms)
+
+	T0 := p.BuildTree(w0)
+
+	T1 := Incremental(w0, T0, w1, info, false)
+	T1IncDebug := T1.Debug()
+
+	T1Full := p.BuildTree(w1)
+	T1FullDebug := T1Full.Debug()
+
+	if T1FullDebug != T1IncDebug {
+		t.Fatalf("incremental & full trees don't match: %s | %s", T1IncDebug, T1FullDebug)
+	}
+}
+
+func TestEmptySuffixW1Simple(t *testing.T) {
+	info := grammarInfoFixture()
+
+	w0 := "i+i+i+i"
+	w1 := "i+i"
+
+	table := BuildTable(info)
+	p := NewLL1Parser(table, info.Terms)
+
+	T0 := p.BuildTree(w0)
+
+	T1 := Incremental(w0, T0, w1, info, false)
+	T1IncDebug := T1.Debug()
+
+	T1Full := p.BuildTree(w1)
+	T1FullDebug := T1Full.Debug()
+
+	if T1FullDebug != T1IncDebug {
+		t.Fatalf("incremental & full trees don't match: %s | %s", T1IncDebug, T1FullDebug)
+	}
+}
