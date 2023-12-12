@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"math"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"LL1/internal/utils"
 
@@ -100,6 +102,9 @@ func NewLL1Parser(t Table, terms map[string]struct{}) LL1Parser {
 
 func iterString(s string, c chan<- rune) {
 	for _, chr := range s {
+		if unicode.IsSpace(chr) {
+			continue
+		}
 		c <- chr
 	}
 	c <- utils.ExtractFirstRune(EOS)
@@ -210,7 +215,20 @@ func copyUntilHelper(pos int, c *Node, p *Node, d *deque.Deque[*Node]) *Node {
 	return n
 }
 
+func filterSpaces(s string) string {
+	var b strings.Builder
+	for _, c := range s {
+		if !unicode.IsSpace(c) {
+			b.WriteRune(c)
+		}
+	}
+	return b.String()
+}
+
 func Incremental(w0 string, T0 *Node, w1 string, info GrammarInfo, greedy bool) *Node {
+	w0 = filterSpaces(w0)
+	w1 = filterSpaces(w1)
+
 	t := BuildTable(info)
 	p := NewLL1Parser(t, info.Terms)
 
@@ -250,11 +268,11 @@ func Incremental(w0 string, T0 *Node, w1 string, info GrammarInfo, greedy bool) 
 		T1 = CopyUntil(xLen, T0, p.d)
 	}
 
-	NmPos := len(w0) - zLen + 1
+	NmPos := utf8.RuneCountInString(w0) - zLen + 1
 	Nm := T0.findPos(NmPos)
 
-	NmPrimePos := len(w1) - zLen + 1
-	nToParse := len(w1) - xLen - zLen + 1
+	NmPrimePos := utf8.RuneCountInString(w1) - zLen + 1
+	nToParse := utf8.RuneCountInString(w1) - xLen - zLen + 1
 	w1 = fmt.Sprintf("%s%s", w1[xLen:], EOS)
 	lastParsedPos := xLen
 	for {
