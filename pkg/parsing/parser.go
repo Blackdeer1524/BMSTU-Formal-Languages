@@ -57,10 +57,13 @@ func printHelper(n *Node, d int, b *strings.Builder, indent int) {
 	if n == nil {
 		return
 	}
-	fmt.Fprintf(b, "%s[%d,%d]\n", n.name, n.pos, n.index)
-	for i := 0; i < d * indent; i++ {
-		b.WriteRune(' ')
+	for i := 0; i < d; i++ {
+		b.WriteRune('┊')
+		for j := 1; j < indent; j++ {
+			b.WriteRune(' ')
+		}
 	}
+	fmt.Fprintf(b, "%s[%d,%d]\n", n.name, n.pos, n.index)
 	for _, c := range n.children {
 		printHelper(c, d+1, b, indent)
 	}

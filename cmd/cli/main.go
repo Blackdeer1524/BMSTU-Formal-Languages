@@ -40,8 +40,8 @@ func main() {
 	T0 := p.BuildTree(w0)
 	T1 := parsing.Incremental(w0, T0, w1, info, strat)
 
-	fmt.Println("T0: \n", T0.Print(4))
-	fmt.Println("T1: \n", T1.Print(4))
+	fmt.Println("T0\n", T0.Print(4))
+	fmt.Println("T1\n", T1.Print(4))
 
 	println(table)
 }
