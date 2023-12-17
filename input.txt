@@ -1,12 +1,7 @@
-+, i, *, (, )
-S -> E
-E -> T Q
-Q -> + T Q | ε                
-T -> F P
-P -> * F P | ε
-F -> i | ( E )
+a
+S -> S S | a
 
 1
-i + i
+a a
 1
-(i + i) * i
+a a a

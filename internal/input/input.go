@@ -19,6 +19,8 @@ func ParseInput(
 	info = parsing.NewGrammarInfo()
 
 	nonTerminalsStr, err := r.ReadString('\n')
+	nonTerminalsStr = strings.TrimFunc(nonTerminalsStr, unicode.IsSpace)
+
 	if err != nil {
 		panic(err)
 	}
@@ -40,10 +42,8 @@ func ParseInput(
 		lineNumber++
 
 		productionStr, err := r.ReadString('\n')
-		if len(productionStr) > 0 &&
-			productionStr[len(productionStr)-1] == '\n' {
-			productionStr = productionStr[:len(productionStr)-1]
-		}
+		productionStr = strings.TrimFunc(productionStr, unicode.IsSpace)
+
 		if err == io.EOF {
 			panic("no input string was given to parse")
 		} else if err != nil {
@@ -105,12 +105,14 @@ func ParseInput(
 	}
 
 	inputLine, err := r.ReadString('\n')
+	inputLine = strings.TrimFunc(inputLine, unicode.IsSpace)
+
 	if err == io.EOF {
 		panic("expected number of lines of w_0")
 	} else if err != nil {
 		panic(err)
 	}
-	w0Size, err := strconv.ParseInt(inputLine[:len(inputLine)-1], 10, 64)
+	w0Size, err := strconv.ParseInt(inputLine, 10, 64)
 	if err != nil {
 		panic(err)
 	}
@@ -118,6 +120,8 @@ func ParseInput(
 	var input strings.Builder
 	for i := 0; i < int(w0Size); i++ {
 		inputLine, err = r.ReadString('\n')
+		inputLine = strings.TrimFunc(inputLine, unicode.IsSpace)
+
 		if err == io.EOF {
 			panic("expected more input for w_0")
 		} else if err != nil {
@@ -126,22 +130,25 @@ func ParseInput(
 		input.WriteString(inputLine)
 	}
 	w0 = input.String()
-	w0 = w0[:len(w0)-1]
 	input.Reset()
 
 	inputLine, err = r.ReadString('\n')
+	inputLine = strings.TrimFunc(inputLine, unicode.IsSpace)
+
 	if err == io.EOF {
 		panic("expected number of lines of w_1")
 	} else if err != nil {
 		panic(err)
 	}
-	w1Size, err := strconv.ParseInt(inputLine[:len(inputLine)-1], 10, 64)
+	w1Size, err := strconv.ParseInt(inputLine, 10, 64)
 	if err != nil {
 		panic(err)
 	}
 
 	for i := 0; i < int(w1Size); i++ {
 		inputLine, err = r.ReadString('\n')
+		inputLine = strings.TrimFunc(inputLine, unicode.IsSpace)
+
 		if err == io.EOF {
 			panic("expected more input for w_0")
 		} else if err != nil {
@@ -150,6 +157,5 @@ func ParseInput(
 		input.WriteString(inputLine)
 	}
 	w1 = input.String()
-	w1 = w1[:len(w1)-1]
 	return
 }
