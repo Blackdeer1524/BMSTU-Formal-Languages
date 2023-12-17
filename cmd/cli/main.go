@@ -42,6 +42,4 @@ func main() {
 
 	fmt.Println("T0\n", T0.Print(4))
 	fmt.Println("T1\n", T1.Print(4))
-
-	println(table)
 }
