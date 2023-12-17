@@ -47,6 +47,25 @@ func (n *Node) Debug() string {
 	return fmt.Sprintf("(%s[%d,%d]:%s)", n.name, n.pos, n.index, builder.String())
 }
 
+func (n *Node) Print(indent int) string {
+	var b strings.Builder
+	printHelper(n, 0, &b, indent)
+	return b.String()
+}
+
+func printHelper(n *Node, d int, b *strings.Builder, indent int) {
+	if n == nil {
+		return
+	}
+	fmt.Fprintf(b, "%s[%d,%d]\n", n.name, n.pos, n.index)
+	for i := 0; i < d * indent; i++ {
+		b.WriteRune(' ')
+	}
+	for _, c := range n.children {
+		printHelper(c, d+1, b, indent)
+	}
+}
+
 func (n *Node) findPos(pos int) *Node {
 	if n.pos == pos {
 		return n
@@ -111,13 +130,13 @@ func iterString(s string, c chan<- rune) {
 }
 
 func (p *LL1Parser) BuildTree(w string) *Node {
-	S := NewNode("S", nil)
+	SPrime := NewNode(SYNTHETIC_START, nil)
 
 	d := deque.New[*Node]()
-	d.PushFront(S)
+	d.PushFront(SPrime)
 
 	p.BuildTreeIncremental(w, 0, math.MaxInt, d)
-	return S
+	return SPrime
 }
 
 func (p *LL1Parser) BuildTreeIncremental(s string, lastParsedPos int, n int, d *deque.Deque[*Node]) {
@@ -262,7 +281,7 @@ func Incremental(w0 string, T0 *Node, w1 string, info GrammarInfo, greedy bool) 
 
 	var T1 *Node
 	if xLen == 0 {
-		T1 = NewNode("S", nil)
+		T1 = NewNode(SYNTHETIC_START, nil)
 		p.d.PushBack(T1)
 	} else {
 		T1 = CopyUntil(xLen, T0, p.d)

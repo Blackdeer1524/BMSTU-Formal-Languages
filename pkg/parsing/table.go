@@ -13,21 +13,24 @@ type GrammarInfo struct {
 	Productions map[string][][]string
 }
 
+const (
+	EPSILON         = "ε"
+	EOS             = string(rune(math.MaxInt32))
+	START           = "S"
+	SYNTHETIC_START = "S'"
+)
+
 func NewGrammarInfo() GrammarInfo {
 	return GrammarInfo{
 		Terms: map[string]struct{}{
 			EOS:     {},
 			EPSILON: {},
 		},
-		Productions: map[string][][]string{},
+		Productions: map[string][][]string{
+			SYNTHETIC_START: {{START, EOS}},
+		},
 	}
 }
-
-const (
-	EPSILON = "ε"
-	EOS     = string(rune(math.MaxInt32))
-	START   = "S"
-)
 
 func getEpsInfo(info GrammarInfo) (res map[string]bool) {
 	res = make(map[string]bool, len(info.Productions))

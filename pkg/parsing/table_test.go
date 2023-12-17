@@ -17,15 +17,10 @@ func printSet(m map[string]struct{}) string {
 }
 
 func TestEps(t *testing.T) {
-	info := GrammarInfo{
-		Terms:       map[string]struct{}{},
-		Productions: map[string][][]string{},
-	}
+	info := NewGrammarInfo()
 	info.Terms["a"] = struct{}{}
-	info.Terms[EOS] = struct{}{}
-	info.Terms[EPSILON] = struct{}{}
 
-	info.Productions["S"] = [][]string{{"a", "A", EOS}}
+	info.Productions["S"] = [][]string{{"a", "A"}}
 	info.Productions["A"] = [][]string{{"B"}, {"C"}}
 	info.Productions["B"] = [][]string{{"B", "a"}, {EPSILON}}
 	info.Productions["C"] = [][]string{{"a"}}
@@ -84,16 +79,11 @@ func testFirstHelper(res map[string]map[string]struct{}, v string, n int, exp []
 }
 
 func TestFirst(t *testing.T) {
-	info := GrammarInfo{
-		Terms:       map[string]struct{}{},
-		Productions: map[string][][]string{},
-	}
+	info := NewGrammarInfo()
 	info.Terms["a"] = struct{}{}
 	info.Terms["b"] = struct{}{}
-	info.Terms[EOS] = struct{}{}
-	info.Terms[EPSILON] = struct{}{}
 
-	info.Productions["S"] = [][]string{{"a", "A", EOS}}
+	info.Productions["S"] = [][]string{{"a", "A"}}
 	info.Productions["A"] = [][]string{{"B"}, {"C"}}
 	info.Productions["B"] = [][]string{{"B", "a"}, {EPSILON}}
 	info.Productions["C"] = [][]string{{"b"}}
@@ -122,21 +112,16 @@ func TestFirst(t *testing.T) {
 }
 
 func TestFirstHard(t *testing.T) {
-	info := GrammarInfo{
-		Terms:       map[string]struct{}{},
-		Productions: map[string][][]string{},
-	}
+	info := NewGrammarInfo()
 	info.Terms["+"] = struct{}{}
 	info.Terms["*"] = struct{}{}
 	info.Terms["i"] = struct{}{}
 	info.Terms["a"] = struct{}{}
 	info.Terms["("] = struct{}{}
 	info.Terms[")"] = struct{}{}
-	info.Terms[EOS] = struct{}{}
-	info.Terms[EPSILON] = struct{}{}
 
 	// E' = Q; T' = P
-	info.Productions["S"] = [][]string{{"E", EOS}}
+	info.Productions["S"] = [][]string{{"E"}}
 	info.Productions["E"] = [][]string{{"T", "Q"}}
 	info.Productions["Q"] = [][]string{{"+", "T", "Q"}, {EPSILON}}
 	info.Productions["T"] = [][]string{{"F", "P"}}
@@ -197,21 +182,16 @@ func testFollowHelper(res map[string]map[string]struct{}, v string, n int, exp [
 }
 
 func TestFollow(t *testing.T) {
-	info := GrammarInfo{
-		Terms:       map[string]struct{}{},
-		Productions: map[string][][]string{},
-	}
+	info := NewGrammarInfo()
 	info.Terms["+"] = struct{}{}
 	info.Terms["*"] = struct{}{}
 	info.Terms["i"] = struct{}{}
 	info.Terms["a"] = struct{}{}
 	info.Terms["("] = struct{}{}
 	info.Terms[")"] = struct{}{}
-	info.Terms[EOS] = struct{}{}
-	info.Terms[EPSILON] = struct{}{}
 
 	// E' = Q; T' = P
-	info.Productions["S"] = [][]string{{"E", EOS}}
+	info.Productions["S"] = [][]string{{"E"}}
 	info.Productions["E"] = [][]string{{"T", "Q"}}
 	info.Productions["Q"] = [][]string{{"+", "T", "Q"}, {EPSILON}}
 	info.Productions["T"] = [][]string{{"F", "P"}}
@@ -276,21 +256,16 @@ func testTableHelper(table map[rune]map[rune]string, v rune, t rune, exp string)
 }
 
 func TestTable(t *testing.T) {
-	info := GrammarInfo{
-		Terms:       map[string]struct{}{},
-		Productions: map[string][][]string{},
-	}
+	info := NewGrammarInfo()
 	info.Terms["+"] = struct{}{}
 	info.Terms["*"] = struct{}{}
 	info.Terms["i"] = struct{}{}
 	info.Terms["a"] = struct{}{}
 	info.Terms["("] = struct{}{}
 	info.Terms[")"] = struct{}{}
-	info.Terms[EOS] = struct{}{}
-	info.Terms[EPSILON] = struct{}{}
 
 	// E' = Q; T' = P
-	info.Productions["S"] = [][]string{{"E", EOS}}
+	info.Productions["S"] = [][]string{{"E"}}
 	info.Productions["E"] = [][]string{{"T", "Q"}}
 	info.Productions["Q"] = [][]string{{"+", "T", "Q"}, {EPSILON}}
 	info.Productions["T"] = [][]string{{"F", "P"}}

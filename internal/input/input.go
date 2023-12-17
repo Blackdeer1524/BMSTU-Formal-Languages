@@ -65,6 +65,9 @@ func ParseInput(
 		}
 
 		lhs := strings.Trim(splitRes[0], " ")
+		if lhs == parsing.SYNTHETIC_START {
+			panic(parsing.SYNTHETIC_START + " is not allowed to be set!!!")
+		}
 
 		if _, ok := info.Productions[lhs]; ok {
 			log.Println(
@@ -94,9 +97,6 @@ func ParseInput(
 
 			vars := strings.Split(rightProductions[i], " ")
 
-			if lhs == parsing.START {
-				vars = append(vars, parsing.EOS)
-			}
 			info.Productions[lhs] = append(
 				info.Productions[lhs],
 				vars,

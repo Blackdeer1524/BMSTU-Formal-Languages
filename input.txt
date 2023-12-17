@@ -1,7 +1,7 @@
-a
-S -> S S | a
+a, b
+S -> b S S | a
 
 1
-a a
+b a a
 1
-a a a
+b a b a a
