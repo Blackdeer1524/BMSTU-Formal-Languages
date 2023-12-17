@@ -1,7 +1,11 @@
-a, b
-S -> b S S | a
+i, +, *, (, )
+S -> T E'
+E' -> + T E' | ε 
+T -> F T'
+T' -> * F T' | ε
+F -> ( S ) | i
 
 1
-b a a
+i + i + i
 1
-b a b a a
+i * i + i

@@ -24,18 +24,20 @@ type Node struct {
 	children []*Node
 	pos      int
 
-	index int
+	index      int
+	_inherited bool
 }
 
 const UNDEFINED = -1
 
 func NewNode(name string, p *Node) *Node {
 	return &Node{
-		name:     name,
-		parent:   p,
-		children: []*Node{},
-		pos:      UNDEFINED,
-		index:    -1,
+		name:       name,
+		parent:     p,
+		children:   []*Node{},
+		pos:        UNDEFINED,
+		index:      -1,
+		_inherited: false,
 	}
 }
 
@@ -63,7 +65,7 @@ func printHelper(n *Node, d int, b *strings.Builder, indent int) {
 			b.WriteRune(' ')
 		}
 	}
-	fmt.Fprintf(b, "%s[%d,%d]\n", n.name, n.pos, n.index)
+	fmt.Fprintf(b, "%s[%d,%d,%t]\n", n.name, n.pos, n.index, n._inherited)
 	for _, c := range n.children {
 		printHelper(c, d+1, b, indent)
 	}
@@ -218,11 +220,12 @@ func CopyUntil(pos int, root *Node, d *deque.Deque[*Node]) *Node {
 
 func copyUntilHelper(pos int, c *Node, p *Node, d *deque.Deque[*Node]) *Node {
 	n := &Node{
-		name:     c.name,
-		parent:   p,
-		children: []*Node{},
-		pos:      c.pos,
-		index:    c.index,
+		name:       c.name,
+		parent:     p,
+		children:   []*Node{},
+		pos:        c.pos,
+		index:      c.index,
+		_inherited: true,
 	}
 	if c.pos > pos || c.pos == UNDEFINED {
 		n.pos = UNDEFINED
