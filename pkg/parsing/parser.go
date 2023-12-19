@@ -260,13 +260,11 @@ func Incremental(w0 string, T0 *Node, w1 string, info GrammarInfo, greedy bool) 
 	rw0 := []rune(w0)
 	rw1 := []rune(w1)
 	xLen := 0
-	fullMatch := true
 	for xLen = range rw0 {
 		if xLen == len(rw1) {
 			break
 		}
 		if rw0[xLen] != rw1[xLen] {
-			fullMatch = false
 			break
 		}
 	}
@@ -274,15 +272,13 @@ func Incremental(w0 string, T0 *Node, w1 string, info GrammarInfo, greedy bool) 
 	i := len(rw0) - 1
 	j := len(rw1) - 1
 	zLen := 0
-	if !fullMatch {
-		for i >= 0 && j >= 0 {
-			if rw0[i] != rw1[j] {
-				break
-			}
-			zLen++
-			i--
-			j--
+	for i >= xLen && j >= xLen {
+		if rw0[i] != rw1[j] {
+			break
 		}
+		zLen++
+		i--
+		j--
 	}
 
 	var T1 *Node
