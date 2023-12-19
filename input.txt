@@ -4,4 +4,4 @@ S -> b S S | a
 1
 babaa
 1
-bababaa
+bababaaaaa

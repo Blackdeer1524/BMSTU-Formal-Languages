@@ -303,13 +303,16 @@ func Incremental(w0 string, T0 *Node, w1 string, info GrammarInfo, greedy bool) 
 		// T1Str := T1.Debug()
 		// fmt.Println(T1Str)
 
-		if nToParse >= len(w1) {
+		if nToParse >= utf8.RuneCountInString(w1) {
 			break
 		} else {
 			w1 = w1[nToParse:]
 		}
 
 		NmPrime := T1.findPos(NmPrimePos)
+		if NmPrime == nil {
+			panic("w_1 ∉  L")
+		}
 
 		// NmPrimeStr := NmPrime.Debug()
 		// fmt.Println(NmPrimeStr)
