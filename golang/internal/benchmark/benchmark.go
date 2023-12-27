@@ -113,7 +113,8 @@ func prepareEnvironment(
 }
 
 func conversionRegularExpression(rww []wordgen.RegexesWithWords, rustBinaryPath string) error {
-	cmd := exec.Command(rustBinaryPath)
+	res := strings.Split(rustBinaryPath, " ")
+	cmd := exec.Command(res[0], res[1:]...)
 
 	var stdin, stdout bytes.Buffer
 
