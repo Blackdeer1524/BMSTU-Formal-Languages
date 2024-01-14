@@ -16,6 +16,6 @@
 cd rust
 cargo build --release
 cd ../golang
-go run main.go
+go run main.go  --binpath=$EXECUTABLE_PATH --regex-n=30 --alphabet-size=20 --max-height=5 --max-len=30
 ```
 
