@@ -63,6 +63,7 @@ printRegex (Chr c) k =
   do (printLn (prepend (k * 3) ' ' "Char " ++ pack [c]))
 
 
+||| ппоследний Bool - это артефакт, нигде не юзается. Он юзался в Regex
 public export 
 data ERegex = EAlt ERegex ERegex Bool
              | EConcat ERegex ERegex Bool
