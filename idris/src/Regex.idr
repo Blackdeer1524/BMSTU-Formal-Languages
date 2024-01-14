@@ -86,6 +86,7 @@ public export
 toString : ERegex -> String
 toString (EAlt x y z) = "(" ++ (toString x) ++ "|" ++ (toString y) ++ ")"
 toString (EConcat x y z) = (toString x) ++ (toString y)
+toString (EGroup (EGroup x y) _) = (toString (EGroup x y))
 toString (EGroup x y) = "(" ++ (toString x) ++ ")"
 toString (EStar x) = "(" ++ (toString x) ++ ")*"
 toString (EChr c) = pack [c]
