@@ -81,6 +81,7 @@ Eq ERegex where
   _ == _ = False
 
 
+public export
 toString : ERegex -> String
 toString (EAlt x y z) = "(" ++ (toString x) ++ "|" ++ (toString y) ++ ")"
 toString (EConcat x y z) = (toString x) ++ (toString y)
