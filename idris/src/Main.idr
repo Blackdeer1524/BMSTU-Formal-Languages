@@ -43,7 +43,7 @@ splitSep str = pack <$> (helper [] (unpack str))
 
 inputProcess : String -> String
 inputProcess str = let x = transform <$> (splitSep str) in 
-                       trim (foldl (\acc, elem => acc ++ "\n" ++ elem) "" x)
+                       trim (foldl (\acc, elem => acc ++ "\n" ++ elem) "" x) ++ "\n"
 
 
 

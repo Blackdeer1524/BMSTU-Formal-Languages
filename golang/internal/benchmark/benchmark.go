@@ -130,7 +130,9 @@ func conversionRegularExpression(rww []wordgen.RegexesWithWords, rustBinaryPath 
 		return fmt.Errorf("failed to run simplifier: %w", rErr)
 	}
 
-	output := strings.TrimSuffix(stdout.String(), "\n")
+    t := stdout.String()
+    println(t)
+	output := strings.TrimRight(t, "\n")
 	outputStrings := strings.Split(output, "\n")
 
 	for i, newRegex := range outputStrings {
