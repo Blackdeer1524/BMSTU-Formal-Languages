@@ -122,7 +122,7 @@ func conversionRegularExpression(rww []wordgen.RegexesWithWords, rustBinaryPath 
 	cmd.Stdout = &stdout
 
 	for _, regexWords := range rww {
-		stdin.WriteString(regexWords.RegexBefore )
+		stdin.WriteString(regexWords.RegexBefore + "\n")
 	}
 
 	rErr := cmd.Run()
