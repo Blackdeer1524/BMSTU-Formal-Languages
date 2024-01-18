@@ -13,36 +13,17 @@ mutual
 
   data TypeAlt = TAlt Regex Regex 
 
-  data TypeConcat = TConcat SimpleRegex Regex 
+  data TypeConcat = TConcat Regex Regex 
 
   data TypeStar = TStar Regex 
 
-  data SimpleRegex : Type where
-    SEmpty : TypeEmpty -> SimpleRegex
-    SNone : TypeNone -> SimpleRegex
-    SChr : TypeChar -> SimpleRegex
-    SStar : TypeStar -> SimpleRegex
-    SAlt : TypeAlt -> SimpleRegex 
-
   data Regex : Type where
-    Unwrap : SimpleRegex -> Regex
-    Concat : SimpleRegex -> Regex -> Regex
-
-
-Empty : Regex
-Empty = Unwrap (SEmpty TEmpty)
-
-None : Regex
-None = Unwrap (SNone TNone)
-
-Chr : Char -> Regex
-Chr c = Unwrap (SChr (TChar c))
-
-Star : Regex -> Regex
-Star x = Unwrap (SStar (TStar x))
-
-Alt : Regex -> Regex -> Regex
-Alt x y = Unwrap (SAlt (TAlt x y))
+    Empty  : TypeEmpty -> Regex 
+    None   : TypeNone -> Regex 
+    Chr    : TypeChar -> Regex 
+    Star   : TypeStar -> Regex 
+    Alt    : TypeAlt -> Regex 
+    Concat : TypeConcat -> Regex 
 
 isNull : Regex -> Bool
 
@@ -57,15 +38,15 @@ runPlus x cs = case (runRegex x cs) of
                     (Just y) => y ++ (flatten $ map (runPlus x) y)
                     Nothing => []
 
-runRegex (Unwrap (SEmpty TEmpty)) x = Just [x]
-runRegex (Unwrap (SNone TNone)) cs = Nothing
-runRegex (Unwrap (SChr (TChar c))) [] = Nothing
-runRegex (Unwrap (SChr (TChar c))) (x :: xs) = 
+runRegex (Empty TEmpty) x = Just [x]
+runRegex (None TNone) cs = Nothing
+runRegex (Chr (TChar c)) [] = Nothing
+runRegex (Chr (TChar c)) (x :: xs) = 
   if x == c 
      then Just [xs]
      else Nothing
-runRegex (Unwrap (SStar (TStar x))) cs = Just ([cs] ++ (runPlus x cs))
-runRegex (Unwrap (SAlt (TAlt x y))) cs = let left = (runRegex x cs) in
+runRegex (Star (TStar x)) cs = Just ([cs] ++ (runPlus x cs))
+runRegex (Alt (TAlt x y)) cs = let left = (runRegex x cs) in
                                          let right = (runRegex y cs) in 
                                              case left of
                                                   (Just z) => case right of
@@ -73,8 +54,8 @@ runRegex (Unwrap (SAlt (TAlt x y))) cs = let left = (runRegex x cs) in
                                                                    Nothing => Just z
                                                   Nothing => right
 
-runRegex (Concat x y) cs = 
-  let left = (runRegex (Unwrap x) cs) in 
+runRegex (Concat (TConcat x y)) cs = 
+  let left = (runRegex x cs) in 
       case left of
            (Just z) => case flatten $ filterNothings $ map (runRegex y) z of
                             (w :: xs) => Just (w :: xs)
