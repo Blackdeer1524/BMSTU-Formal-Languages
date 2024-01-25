@@ -60,29 +60,6 @@ spanP f = MkParser (\arg =>
               Just (second, first)
           )
 
--- notNull : Parser (List Char) -> Parser (List Char) 
--- notNull (MkParser f) = MkParser (\arg => 
---                        do (input', res) <- f arg
---                           if null res
---                              then Nothing
---                              else Just (input', res)
---                        )
--- sep : Char -> Parser Char
--- sep c = spanP isSpace *> charP c <* spanP isSpace
-
--- string : Parser Regex
--- string = MkParser (\arg => 
---          do (input', res) <- runParser (spanP isAlphaNum) arg
---             case res of 
---                  (x :: xs) => Just (input', toConcat (Chr x) xs)
---                  [] => Nothing
---          )
---   where
---     toConcat : (acc : Regex) -> List Char -> Regex
---     toConcat acc [] = acc
---     toConcat acc (x :: xs) = toConcat (Concat acc (Chr x) False) xs
-
-
 isAlphaP : Parser Regex
 isAlphaP = MkParser (\arg => 
            case arg of
@@ -144,12 +121,6 @@ alternatives = MkParser (\arg =>
            (let (remainder, xs) = parseRec input' in 
                 Just (remainder, makeAlt res xs)
             )
-           -- let (remainder, xs) = parseRec input'
-           -- let sortedXs = sort xs
-           -- let least = case sortedXs of
-           --      (x :: ys) => min x res 
-           --      [] => res 
-           -- Just (remainder, makeAlt least sortedXs)
         )
   where
     parseRec: List Char -> (List Char, List Regex)

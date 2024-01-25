@@ -95,6 +95,7 @@ toString Eps = ""
 Ord ERegex where
   left < right = (toString left) < (toString right) 
 
+public export
 Cast (Regex) (ERegex) where
   cast (Alt x y z) = EAlt (cast x) (cast y) z
   cast (Concat x y z) = (EConcat (cast x) (cast y) z)
@@ -216,6 +217,7 @@ ssnfHelper (EChr c)   = EChr c
 ssnfHelper (Eps)   = Eps
 
 altToList : ERegex -> List ERegex
+altToList (EGroup x y) = altToList x
 altToList (EAlt x y z) = (altToList x) ++ (altToList y)
 altToList x = [x]
 
@@ -301,19 +303,20 @@ makeEConcat Eps             (Eps :: xs)             = makeEConcat (EConcat Eps  
 public export
 ACINormalize : ERegex -> ERegex
 ACINormalize (EAlt x y z) =  
-  let altList = map ACINormalize (unique (sort (altToList (EAlt x y z)))) in
+  let altList = unique (sort (map ACINormalize (altToList (EAlt x y z)))) in
       case altList of
          (w :: xs) => (makeEAlt w xs)
-         [] => Eps  -- ok
+         [] => Eps
   where
       unique : List ERegex -> List ERegex  
       unique [] = []
       unique (w :: []) = [w]
-      unique (w :: (v :: xs)) = if w == v 
+      unique (w :: (v :: xs)) = if w == v
                                    then unique (v :: xs)
                                    else w :: unique (v :: xs)
 
 ACINormalize (EConcat x y z) = (EConcat (ACINormalize x) (ACINormalize y) z)
+ACINormalize (EGroup (EAlt x z w) y) = ACINormalize (EAlt x z w)  
 ACINormalize (EGroup x y) = (EGroup (ACINormalize x) y) 
 ACINormalize (EStar x) = (EStar (ACINormalize x)) 
 ACINormalize (EChr c) = (EChr c) 
@@ -335,6 +338,9 @@ flattenConcat (EConcat x Eps v) = flattenConcat x
 flattenConcat (EConcat x y v) = flattenConcat x ++ (flattenConcat y)
 flattenConcat x = [x]
 
+p = [(EChr 'x'), EAlt (EChr 'b') (EChr 'c') False]
+q = [(EChr 'a'), EAlt (EChr 'b') (EChr 'c') False]
+
 public export
 getCommonPrefix: (pref : List ERegex) -> (left : List ERegex) -> (right : List ERegex) -> (List ERegex, List ERegex, List ERegex)
 getCommonPrefix pref (w :: xs) (v :: ys) = 
@@ -351,14 +357,34 @@ getCommonSuffix left right =
       (reverse suff, reverse resLeft, reverse resRight)
 
 
-a = getCommonSuffix (flattenConcat (EConcat (EConcat (EChr 'a') (EChr 'b') False) (EChr 'c') False)) (flattenConcat (EConcat (EChr 'a') (EChr 'c') False)) 
+-- a = getCommonSuffix (flattenConcat (EConcat (EConcat (EChr 'a') (EChr 'b') False) (EChr 'c') False)) (flattenConcat (EConcat (EChr 'a') (EChr 'c') False)) 
 
+
+
+public export
+fixDstr : ERegex -> ERegex
+fixDstr (EAlt x y z) = (EAlt (fixDstr x) (fixDstr y) False)
+fixDstr (EConcat Eps Eps z) = Eps
+fixDstr (EConcat Eps y z) = fixDstr y
+fixDstr (EConcat x Eps z) = fixDstr x
+fixDstr (EConcat x y z) = 
+  let left = (fixDstr x) in 
+  let right = (fixDstr y) in 
+      case (left, right) of
+           (Eps, Eps)  => Eps
+           (x, Eps)  => x
+           (Eps, x)  => x
+           (y, x)  => (EConcat y x False) 
+      -- (EConcat left right False) 
+fixDstr (EGroup x y) = (EGroup (fixDstr x) False)
+fixDstr (EStar x) = EStar (fixDstr x) 
+fixDstr x = x
 
 public export
 distribute : ERegex -> ERegex
 distribute (EAlt x y z) = 
-  let left =  distribute x in
-  let right = distribute y in
+  let left =  EConcat Eps (distribute x) False in
+  let right = EConcat Eps (distribute y) False in
       case (left, right) of
            ((EConcat ll lr t), (EConcat rl rr x1)) => 
                let leftConcatArgs  = flattenConcat left  in 
@@ -366,8 +392,8 @@ distribute (EAlt x y z) =
                    let (pref, leftConcatArgs, rightConcatArgs) = getCommonPrefix [] leftConcatArgs rightConcatArgs in 
                    let (suff, leftConcatArgs, rightConcatArgs) = getCommonSuffix    leftConcatArgs rightConcatArgs in 
                         case (length leftConcatArgs > 0, length rightConcatArgs > 0) of
-                             (False, False) => left
-                             (False, True) => (EConcat 
+                             (False, False) => fixDstr left
+                             (False, True) => fixDstr (EConcat 
                                                   (EConcat 
                                                       (makeEConcat Eps pref) 
                                                       (EAlt 
@@ -377,7 +403,7 @@ distribute (EAlt x y z) =
                                                        False)
                                                    (makeEConcat Eps suff)
                                                    False)
-                             (True, False) =>(EConcat 
+                             (True, False) => fixDstr (EConcat 
                                                   (EConcat 
                                                       (makeEConcat Eps pref) 
                                                       (EAlt 
@@ -387,7 +413,7 @@ distribute (EAlt x y z) =
                                                        False)
                                                    (makeEConcat Eps suff)
                                                    False) 
-                             (True, True) => (EConcat 
+                             (True, True) => fixDstr (EConcat 
                                                   (EConcat 
                                                       (makeEConcat Eps pref) 
                                                       (EAlt 
@@ -397,13 +423,26 @@ distribute (EAlt x y z) =
                                                        False)
                                                    (makeEConcat Eps suff)
                                                    False) 
-           x => (EAlt left right z)
-
-  where
-
-distribute (EConcat x y z) = (EConcat (distribute x) (distribute y) z) 
-distribute (EGroup x y) = (EGroup (distribute x) y) 
-distribute (EStar x) =(EStar (distribute x)) 
+           x => fixDstr (EAlt (distribute left) (distribute right) z)
+distribute (EConcat x y z) = fixDstr (EConcat (distribute x) (distribute y) z) 
+distribute (EGroup x y) = fixDstr (EGroup (distribute x) y) 
+distribute (EStar x) = fixDstr (EStar (distribute x)) 
 distribute (EChr c) = (EConcat Eps (EChr c) False)
 distribute Eps = Eps
+
+
+x =(EAlt 
+            (EConcat (EChr 'a') (EChr 'b') False) 
+            (EConcat (EChr 'a') (EChr 'c') False) False)
+left = (fixDstr (distribute x))
+
+y= (EConcat 
+            (EChr 'd') 
+            (EAlt (EChr 'b') (EChr 'c') False) False)
+right = (fixDstr (distribute y))
+
+a = (EAlt 
+        x 
+        y False) 
+
 
